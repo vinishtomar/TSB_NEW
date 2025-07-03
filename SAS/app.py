@@ -16,9 +16,13 @@ login_manager.login_message = "Veuillez vous connecter pour accéder à cette pa
 login_manager.login_message_category = "info"
 
 app.secret_key = os.environ.get('SECRET_KEY', 'a_secure_random_secret_key_for_development')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app_dashboard.db'
+
+# --- DATABASE CONFIGURATION (UPDATED FOR POSTGRESQL) ---
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://tsb_jilz_user:WQuuirqxSdknwZjsvldYzD0DbhcOBzQ7@dpg-d0jjegmmcj7s73836lp0-a/tsb_jilz'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 db = SQLAlchemy(app)
+
 
 # --- DATABASE MODELS ---
 
@@ -34,7 +38,7 @@ class Client(db.Model):
     email = db.Column(db.String(120), nullable=True)
     phone = db.Column(db.String(50), nullable=True)
     address = db.Column(db.String(200), nullable=True)
-    status = db.Column(db.String(50), default='Prospect') # Prospect, Ongoing, Completed, Needs Follow-up
+    status = db.Column(db.String(50), default='Prospect')
     last_contact_date = db.Column(db.DateTime, default=datetime.utcnow)
     quotes = db.relationship('Quote', backref='client', lazy=True, cascade="all, delete-orphan")
 
@@ -46,7 +50,7 @@ class Equipment(db.Model):
     serial_number = db.Column(db.String(120), unique=True)
     last_maintenance_date = db.Column(db.Date)
     next_maintenance_date = db.Column(db.Date)
-    status = db.Column(db.String(50), default='In Service') # In Service, Broken, Out of Order
+    status = db.Column(db.String(50), default='In Service')
     assigned_client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=True)
     assigned_client = db.relationship('Client', backref='equipment')
 
@@ -58,7 +62,7 @@ class Quote(db.Model):
     details = db.Column(db.Text)
     price = db.Column(db.Float)
     vat_rate = db.Column(db.Float, default=0.20)
-    status = db.Column(db.String(50), default='Pending') # Pending, Approved, Rejected
+    status = db.Column(db.String(50), default='Pending')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     expires_at = db.Column(db.DateTime, default=lambda: datetime.utcnow() + timedelta(days=30))
 
@@ -79,14 +83,12 @@ class Alert(db.Model):
 def generate_alerts():
     """Checks for conditions and creates alerts."""
     today = datetime.utcnow().date()
-    Alert.query.delete() # Simple regeneration; in production you'd update/dismiss instead.
+    Alert.query.delete()
     
-    # Maintenance alerts
     maintenance_due = Equipment.query.filter(Equipment.next_maintenance_date <= today + timedelta(days=30)).all()
     for item in maintenance_due:
         db.session.add(Alert(message=f"Maintenance for {item.name} ({item.brand})", category="Maintenance", related_id=item.id, due_date=item.next_maintenance_date))
 
-    # Quote expiration alerts
     quotes_expiring = Quote.query.filter(Quote.expires_at <= datetime.utcnow() + timedelta(days=7), Quote.status == 'Pending').all()
     for quote in quotes_expiring:
         db.session.add(Alert(message=f"Quote #{quote.quote_number} for {quote.client.name} expires soon", category="Quote", related_id=quote.id, due_date=quote.expires_at))
@@ -227,16 +229,16 @@ def generate_quote_pdf(quote_id):
     response.headers['Content-Disposition'] = f'inline; filename=Quote_{quote.quote_number}.pdf'
     return response
 
-# --- INITIALIZATION ---
-# This block will now run when the app starts on Render
+# --- DATABASE AND APP INITIALIZATION ---
+# This block runs when the app starts, ensuring the DB is created.
 with app.app_context():
     db.create_all()
-    # Create a default user if none exists
+    # Create a default admin user if one doesn't exist
     if not User.query.filter_by(username='admin').first():
         hashed_password = bcrypt.generate_password_hash('admin').decode('utf-8')
         db.session.add(User(username='admin', password_hash=hashed_password, role='admin'))
         db.session.commit()
 
-# This part is now only for running locally
+# This part is now only for running the app locally
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)), debug=True)
