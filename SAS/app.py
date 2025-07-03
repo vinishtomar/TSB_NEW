@@ -228,11 +228,15 @@ def generate_quote_pdf(quote_id):
     return response
 
 # --- INITIALIZATION ---
+# This block will now run when the app starts on Render
+with app.app_context():
+    db.create_all()
+    # Create a default user if none exists
+    if not User.query.filter_by(username='admin').first():
+        hashed_password = bcrypt.generate_password_hash('admin').decode('utf-8')
+        db.session.add(User(username='admin', password_hash=hashed_password, role='admin'))
+        db.session.commit()
+
+# This part is now only for running locally
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-        if not User.query.filter_by(username='admin').first():
-            hashed_password = bcrypt.generate_password_hash('admin').decode('utf-8')
-            db.session.add(User(username='admin', password_hash=hashed_password, role='admin'))
-            db.session.commit()
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)), debug=True)
