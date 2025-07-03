@@ -1,81 +1,96 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <style>
-        @page { size: A4; margin: 1in; }
-        body { font-family: 'Helvetica', sans-serif; color: #333; font-size: 11pt; }
-        .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #005A9C; padding-bottom: 15px; }
-        .company-details { text-align: left; }
-        .company-details h1 { color: #005A9C; margin: 0; font-size: 24pt; }
-        .quote-details { text-align: right; }
-        .quote-details h2 { font-size: 16pt; margin: 0; }
-        .client-info { margin-top: 40px; margin-bottom: 40px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
-        thead { background-color: #e9ecef; color: #000; font-weight: bold; }
-        .total-section { margin-top: 30px; float: right; width: 40%; }
-        .total-section table { width: 100%; }
-        .total-section td { border: none; padding: 5px; }
-        .total-section .total { font-weight: bold; font-size: 14pt; border-top: 2px solid #333; }
-        pre { font-family: 'Helvetica', sans-serif; white-space: pre-wrap; margin: 0; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <div class="company-details">
-            <h1>TSB Énergie</h1>
-            <p>123 Rue de l'Exemple<br>31000 Toulouse, France<br>contact@tsb-energie.fr</p>
-        </div>
-        <div class="quote-details">
-            <h2>DEVIS</h2>
-            <p><strong>Numéro:</strong> {{ quote.quote_number }}</p>
-            <p><strong>Date:</strong> {{ quote.created_at.strftime('%d/%m/%Y') }}</p>
-        </div>
-    </div>
+:root {
+    --primary-color: #005A9C;
+    --sidebar-bg: #1e293b;
+    --sidebar-text: #cbd5e1;
+    --sidebar-text-hover: #ffffff;
+    --sidebar-active-bg: #334155;
+    --content-bg: #f1f5f9;
+}
 
-    <div class="client-info">
-        <h3>Adressé à :</h3>
-        <p>
-            <strong>{{ quote.client.name }}</strong><br>
-            {{ quote.client.address|replace('\n', '<br>')|safe if quote.client.address else '' }}<br>
-            {{ quote.client.email or '' }}
-        </p>
-    </div>
+body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: var(--content-bg);
+}
+/* Login Page Specific Styles */
+.login-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background-color: var(--content-bg);
+}
+.login-card {
+    width: 100%;
+    max-width: 420px;
+}
+/* Main Application Styles */
+.page-wrapper {
+    display: flex;
+    min-height: 100vh;
+}
+.sidebar {
+    width: 260px;
+    background-color: var(--sidebar-bg);
+    color: var(--sidebar-text);
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    transition: width 0.2s;
+}
+.sidebar-header {
+    padding: 1.5rem 1rem;
+    text-align: center;
+    border-bottom: 1px solid var(--sidebar-active-bg);
+}
+.sidebar-header .logo { height: 40px; margin-bottom: 0.5rem; }
+.sidebar-header .brand-name { font-size: 1.2rem; font-weight: 600; color: white; }
 
-    <table>
-        <thead>
-            <tr>
-                <th style="width:70%;">Description</th>
-                <th>Prix HT</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>
-                    <strong>{{ quote.service_type }}</strong><br>
-                    <pre>{{ quote.details }}</pre>
-                </td>
-                <td style="text-align: right;">{{ "%.2f"|format(quote.price) }} €</td>
-            </tr>
-        </tbody>
-    </table>
+.sidebar .nav-link {
+    color: var(--sidebar-text);
+    padding: 0.8rem 1.5rem;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    border-left: 3px solid transparent;
+}
+.sidebar .nav-link i { margin-right: 1rem; font-size: 1.2rem; }
+.sidebar .nav-link:hover { background-color: var(--sidebar-active-bg); color: var(--sidebar-text-hover); }
+.sidebar .nav-link.active { background-color: var(--sidebar-active-bg); color: white; font-weight: 600; border-left-color: var(--primary-color); }
 
-    <div class="total-section">
-        <table>
-            <tr>
-                <td>Total HT</td>
-                <td style="text-align: right;">{{ "%.2f"|format(quote.price) }} €</td>
-            </tr>
-            <tr>
-                <td>TVA ({{ (quote.vat_rate * 100)|int }}%)</td>
-                <td style="text-align: right;">{{ "%.2f"|format(quote.price * quote.vat_rate) }} €</td>
-            </tr>
-            <tr class="total">
-                <td>Total TTC</td>
-                <td style="text-align: right;">{{ "%.2f"|format(quote.total_price) }} €</td>
-            </tr>
-        </table>
-    </div>
-</body>
-</html>
+.sidebar-footer {
+    margin-top: auto;
+    padding: 1rem;
+}
+.sidebar-footer .logout-btn {
+    width: 100%;
+    background-color: var(--sidebar-active-bg);
+    color: white;
+    border: none;
+    text-align: center;
+}
+.main-content {
+    margin-left: 260px;
+    flex-grow: 1;
+    padding: 2rem;
+}
+.page-title {
+    font-weight: 700;
+    color: #334155;
+    margin-bottom: 0.5rem;
+}
+.card {
+    border: none;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+.card.dashboard-card { border-left: 4px solid var(--primary-color); }
+.card .card-header {
+    background-color: #fff;
+    font-weight: 600;
+    color: #333;
+    border-bottom: 1px solid #e9ecef;
+}
