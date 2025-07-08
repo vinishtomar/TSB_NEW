@@ -78,6 +78,16 @@ class Alert(db.Model):
     due_date = db.Column(db.DateTime)
     is_dismissed = db.Column(db.Boolean, default=False)
 
+class Employee(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    full_name = db.Column(db.String(150), nullable=False)
+    position = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=True)
+    phone = db.Column(db.String(50), nullable=True)
+    hire_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
+    salary = db.Column(db.Float, nullable=True)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+
 # --- UTILITY FUNCTIONS ---
 
 def generate_alerts():
@@ -228,6 +238,54 @@ def generate_quote_pdf(quote_id):
     response.headers['Content-Type'] = 'application/pdf'
     response.headers['Content-Disposition'] = f'inline; filename=Quote_{quote.quote_number}.pdf'
     return response
+
+## Employee Routes
+@app.route('/employees')
+@login_required
+def list_employees():
+    employees = Employee.query.filter_by(is_active=True).order_by(Employee.full_name).all()
+    return render_template('main_template.html', view='employees_list', employees=employees)
+
+@app.route('/employee/add', methods=['GET', 'POST'])
+@login_required
+def add_employee():
+    if request.method == 'POST':
+        hire_date = datetime.strptime(request.form['hire_date'], '%Y-%m-%d').date() if request.form['hire_date'] else datetime.utcnow().date()
+        salary = float(request.form['salary']) if request.form['salary'] else None
+        
+        new_employee = Employee(
+            full_name=request.form['full_name'],
+            position=request.form['position'],
+            email=request.form['email'],
+            phone=request.form['phone'],
+            hire_date=hire_date,
+            salary=salary
+        )
+        db.session.add(new_employee)
+        db.session.commit()
+        flash('Employee added successfully!', 'success')
+        return redirect(url_for('list_employees'))
+        
+    return render_template('main_template.html', view='employee_form', form_title="Ajouter un Employé", employee=None)
+
+@app.route('/employee/edit/<int:employee_id>', methods=['GET', 'POST'])
+@login_required
+def edit_employee(employee_id):
+    employee = Employee.query.get_or_404(employee_id)
+    if request.method == 'POST':
+        employee.full_name = request.form['full_name']
+        employee.position = request.form['position']
+        employee.email = request.form['email']
+        employee.phone = request.form['phone']
+        employee.hire_date = datetime.strptime(request.form['hire_date'], '%Y-%m-%d').date() if request.form['hire_date'] else employee.hire_date
+        employee.salary = float(request.form['salary']) if request.form['salary'] else employee.salary
+        
+        db.session.commit()
+        flash('Employee details updated successfully!', 'success')
+        return redirect(url_for('list_employees'))
+        
+    return render_template('main_template.html', view='employee_form', form_title="Modifier l'Employé", employee=employee)
+
 
 # --- DATABASE AND APP INITIALIZATION ---
 # This block runs when the app starts, ensuring the DB is created.
