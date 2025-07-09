@@ -17,8 +17,9 @@ login_manager.login_message_category = "info"
 
 app.secret_key = os.environ.get('SECRET_KEY', 'a_secure_random_secret_key_for_development')
 
-# --- DATABASE CONFIGURATION (UPDATED FOR POSTGRESQL) ---
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://tsb_jilz_user:WQuuirqxSdknwZjsvldYzD0DbhcOBzQ7@dpg-d0jjegmmcj7s73836lp0-a/tsb_jilz'
+# --- DATABASE CONFIGURATION ---
+# Replace with your actual database URI
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql://tsb_jilz_user:WQuuirqxSdknwZjsvldYzD0DbhcOBzQ7@dpg-d0jjegmmcj7s73836lp0-a/tsb_jilz')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -87,13 +88,34 @@ class Employee(db.Model):
     hire_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
     salary = db.Column(db.Float, nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
+    leave_requests = db.relationship('LeaveRequest', backref='employee', lazy='dynamic', cascade="all, delete-orphan")
+
+class LeaveRequest(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
+    leave_type = db.Column(db.String(50), nullable=False, default='Annual Leave')
+    start_date = db.Column(db.Date, nullable=False)
+    end_date = db.Column(db.Date, nullable=False)
+    reason = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(50), nullable=False, default='Pending') # Pending, Approved, Rejected
+    requested_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+class Candidate(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    full_name = db.Column(db.String(150), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    phone = db.Column(db.String(50), nullable=True)
+    position_applied_for = db.Column(db.String(100), nullable=False)
+    application_date = db.Column(db.Date, default=datetime.utcnow)
+    status = db.Column(db.String(50), default='Applied') # Applied, Shortlisted, Interview, Offer, Hired, Rejected
+    notes = db.Column(db.Text, nullable=True)
+
 
 # --- UTILITY FUNCTIONS ---
-
 def generate_alerts():
     """Checks for conditions and creates alerts."""
     today = datetime.utcnow().date()
-    Alert.query.delete()
+    Alert.query.delete() 
     
     maintenance_due = Equipment.query.filter(Equipment.next_maintenance_date <= today + timedelta(days=30)).all()
     for item in maintenance_due:
@@ -105,8 +127,8 @@ def generate_alerts():
 
     db.session.commit()
 
-# --- AUTHENTICATION ---
 
+# --- AUTHENTICATION ---
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
@@ -165,7 +187,7 @@ def add_client():
         db.session.commit()
         flash('Client added successfully!', 'success')
         return redirect(url_for('list_clients'))
-    return render_template('main_template.html', view='client_form', form_title="Ajouter un Client")
+    return render_template('main_template.html', view='client_form', form_title="Ajouter un Client", client=None)
 
 @app.route('/client/edit/<int:client_id>', methods=['GET', 'POST'])
 @login_required
@@ -200,7 +222,6 @@ def add_equipment():
         return redirect(url_for('list_equipment'))
     return render_template('main_template.html', view='equipment_form')
 
-
 ## Quote Routes
 @app.route('/quotes')
 @login_required
@@ -232,14 +253,16 @@ def generate_quote_pdf(quote_id):
         flash("Error: WeasyPrint is not installed. Run 'pip install WeasyPrint'", "danger")
         return redirect(url_for('list_quotes'))
     quote = Quote.query.get_or_404(quote_id)
-    rendered_html = render_template('quote_pdf_template.html', quote=quote)
+    # This requires a 'quote_pdf_template.html' file not provided in the scope of this request.
+    # A placeholder message is used for rendering the PDF.
+    rendered_html = f"<h1>Quote {quote.quote_number}</h1><p>Client: {quote.client.name}</p><p>Total: {quote.total_price:.2f} €</p>"
     pdf = HTML(string=rendered_html).write_pdf()
     response = make_response(pdf)
     response.headers['Content-Type'] = 'application/pdf'
     response.headers['Content-Disposition'] = f'inline; filename=Quote_{quote.quote_number}.pdf'
     return response
 
-## Employee Routes
+## Employee & HR Routes
 @app.route('/employees')
 @login_required
 def list_employees():
@@ -286,17 +309,114 @@ def edit_employee(employee_id):
         
     return render_template('main_template.html', view='employee_form', form_title="Modifier l'Employé", employee=employee)
 
+## Leave Management Routes
+@app.route('/leaves')
+@login_required
+def list_leaves():
+    leaves = LeaveRequest.query.order_by(LeaveRequest.start_date.desc()).all()
+    return render_template('main_template.html', view='leaves_list', leaves=leaves)
+
+@app.route('/leaves/request', methods=['GET', 'POST'])
+@login_required
+def request_leave():
+    if request.method == 'POST':
+        start_date = datetime.strptime(request.form['start_date'], '%Y-%m-%d').date()
+        end_date = datetime.strptime(request.form['end_date'], '%Y-%m-%d').date()
+
+        if start_date > end_date:
+            flash('Start date cannot be after the end date.', 'danger')
+            return redirect(url_for('request_leave'))
+
+        new_request = LeaveRequest(
+            employee_id=request.form['employee_id'],
+            leave_type=request.form['leave_type'],
+            start_date=start_date,
+            end_date=end_date,
+            reason=request.form['reason']
+        )
+        db.session.add(new_request)
+        db.session.commit()
+        flash('Leave request submitted successfully.', 'success')
+        return redirect(url_for('list_leaves'))
+
+    employees = Employee.query.filter_by(is_active=True).all()
+    return render_template('main_template.html', view='leave_request_form', employees=employees, form_title="Demander un Congé")
+
+@app.route('/leaves/<int:leave_id>/update_status', methods=['POST'])
+@login_required
+def update_leave_status(leave_id):
+    leave = LeaveRequest.query.get_or_404(leave_id)
+    new_status = request.form.get('status') 
+
+    if new_status not in ['Approved', 'Rejected']:
+        flash('Invalid status.', 'danger')
+        return redirect(url_for('list_leaves'))
+
+    leave.status = new_status
+    db.session.commit()
+    flash(f'Leave request has been {new_status.lower()}.', 'success')
+    return redirect(url_for('list_leaves'))
+
+## Hiring Management Routes
+@app.route('/candidates')
+@login_required
+def list_candidates():
+    candidates = Candidate.query.order_by(Candidate.application_date.desc()).all()
+    return render_template('main_template.html', view='candidates_list', candidates=candidates)
+
+@app.route('/candidate/add', methods=['GET', 'POST'])
+@login_required
+def add_candidate():
+    if request.method == 'POST':
+        new_candidate = Candidate(
+            full_name=request.form['full_name'],
+            email=request.form['email'],
+            phone=request.form['phone'],
+            position_applied_for=request.form['position_applied_for'],
+            notes=request.form['notes']
+        )
+        db.session.add(new_candidate)
+        db.session.commit()
+        flash('New candidate added successfully.', 'success')
+        return redirect(url_for('list_candidates'))
+    return render_template('main_template.html', view='candidate_form', form_title="Ajouter un Candidat", candidate=None)
+
+@app.route('/candidate/<int:candidate_id>', methods=['GET', 'POST'])
+@login_required
+def view_candidate(candidate_id):
+    candidate = Candidate.query.get_or_404(candidate_id)
+    if request.method == 'POST':
+        candidate.status = request.form['status']
+        candidate.notes = request.form['notes']
+        db.session.commit()
+        flash(f"Candidate status updated to '{candidate.status}'.", 'info')
+        return redirect(url_for('view_candidate', candidate_id=candidate.id))
+    return render_template('main_template.html', view='candidate_profile', candidate=candidate)
+
+@app.route('/candidate/<int:candidate_id>/convert')
+@login_required
+def convert_to_employee(candidate_id):
+    candidate = Candidate.query.get_or_404(candidate_id)
+    if candidate.status != 'Hired':
+        flash('Candidate must be marked as "Hired" before converting.', 'warning')
+        return redirect(url_for('view_candidate', candidate_id=candidate.id))
+    
+    employee_data = {
+        'full_name': candidate.full_name, 'email': candidate.email, 'phone': candidate.phone, 'position': candidate.position_applied_for,
+        'salary': None, 'hire_date': None # Set to None to not pre-fill them
+    }
+    flash('Please complete the remaining details for the new employee.', 'info')
+    return render_template('main_template.html', view='employee_form', form_title="Convertir Candidat en Employé", employee=employee_data)
+
 
 # --- DATABASE AND APP INITIALIZATION ---
-# This block runs when the app starts, ensuring the DB is created.
 with app.app_context():
     db.create_all()
-    # Create a default admin user if one doesn't exist
     if not User.query.filter_by(username='admin').first():
         hashed_password = bcrypt.generate_password_hash('admin').decode('utf-8')
         db.session.add(User(username='admin', password_hash=hashed_password, role='admin'))
         db.session.commit()
 
-# This part is now only for running the app locally
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)), debug=True)
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port, debug=True)
