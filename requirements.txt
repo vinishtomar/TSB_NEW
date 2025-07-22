@@ -3,5 +3,3 @@ Flask-Login
 Flask-Bcrypt
 Flask-SQLAlchemy
 WeasyPrint
-gunicorn
-psycopg2
