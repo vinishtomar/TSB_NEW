@@ -154,6 +154,23 @@ class PlanningEvent(db.Model):
 
 
 # --- UTILITY FUNCTIONS ---
+from functools import wraps
+from flask import abort # Assurez-vous que abort est bien importé
+
+def role_required(roles):
+    """
+    Décorateur personnalisé pour vérifier le rôle de l'utilisateur.
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            # Si le rôle de l'utilisateur actuel n'est pas dans la liste des rôles autorisés
+            if not current_user.is_authenticated or current_user.role not in roles:
+                abort(403) # On retourne une erreur "Interdit"
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
 def generate_alerts():
     """Checks for conditions and creates alerts."""
     today = datetime.utcnow().date()
@@ -207,6 +224,43 @@ def dashboard():
     alerts = Alert.query.filter_by(is_dismissed=False).order_by(Alert.due_date.asc()).all()
     return render_template('main_template.html', view='dashboard', clients=clients, quotes=quotes, alerts=alerts)
 
+# --- AJOUT : ROUTES POUR LA GESTION DES UTILISATEURS ---
+
+@app.route('/users')
+@login_required
+@role_required(['admin']) # Seul le Directeur peut accéder à cette page
+def manage_users():
+    users = User.query.all()
+    return render_template('main_template.html', view='users_list', users=users)
+
+@app.route('/users/add', methods=['POST'])
+@login_required
+@role_required(['admin']) # Seul le Directeur peut ajouter un utilisateur
+def add_user():
+    username = request.form.get('username')
+    password = request.form.get('password')
+    role = request.form.get('role')
+
+    if not username or not password or not role:
+        flash("Tous les champs sont requis.", "danger")
+        return redirect(url_for('manage_users'))
+
+    # Vérifier si l'utilisateur existe déjà
+    if User.query.filter_by(username=username).first():
+        flash("Ce nom d'utilisateur existe déjà.", "warning")
+        return redirect(url_for('manage_users'))
+
+    # Hasher le mot de passe et créer le nouvel utilisateur
+    hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+    new_user = User(username=username, password_hash=hashed_password, role=role)
+    
+    db.session.add(new_user)
+    db.session.commit()
+    
+    flash("Nouvel utilisateur ajouté avec succès.", "success")
+    return redirect(url_for('manage_users'))
+
+# ---------------------------------------------------------
 ## Client Routes
 @app.route('/clients')
 @login_required
@@ -481,4 +535,3 @@ with app.app_context():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
-    

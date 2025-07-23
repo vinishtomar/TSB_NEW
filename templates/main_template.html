@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
     <meta charset="UTF-8">
     <title>
@@ -24,6 +25,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
+
 <body>
     {# --- VUE DE LA PAGE DE CONNEXION --- #}
     {% if view == 'login' %}
@@ -34,11 +36,11 @@
                     <img src="{{ url_for('static', filename='tsb-logo.png') }}" alt="Logo" style="height: 50px;">
                     <h3 class="card-title mt-2">TSB Manager</h3>
                 </div>
-                 {% with messages = get_flashed_messages(with_categories=true) %}
-                     {% if messages %}{% for category, message in messages %}
-                     <div class="alert alert-{{ category }}">{{ message }}</div>
-                     {% endfor %}{% endif %}
-                 {% endwith %}
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}{% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}{% endif %}
+                {% endwith %}
                 <form method="POST" action="{{ url_for('login') }}">
                     <div class="mb-3">
                         <label for="username" class="form-label">Username</label>
@@ -61,45 +63,66 @@
     <button id="toggle-sidebar" class="menu-toggle">
         <i class="bi bi-list"></i>
     </button>
-    
+
     <div class="page-wrapper">
         <aside class="sidebar">
             <div class="sidebar-header">
                 <img src="{{ url_for('static', filename='tsb-logo.png') }}" alt="Logo" class="logo">
                 <span class="brand-name">TSB Manager</span>
             </div>
-            
+
             <nav class="nav">
                 <div class="nav-scroll-content">
-                    <a class="nav-link {% if view == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}"><i class="bi bi-house-door-fill"></i> Dashboard</a>
+                    <a class="nav-link {% if view == 'dashboard' %}active{% endif %}"
+                        href="{{ url_for('dashboard') }}"><i class="bi bi-house-door-fill"></i> Dashboard</a>
                     <div class="mt-2">
                         <h3 class="nav-category-title">RH</h3>
-                        <a class="nav-link {% if 'employee' in view %}active{% endif %}" href="{{ url_for('list_employees') }}"><i class="bi bi-people-fill"></i> Employés</a>
-                        <a class="nav-link {% if 'leave' in view %}active{% endif %}" href="{{ url_for('list_leaves') }}"><i class="bi bi-calendar-check-fill"></i> Congés</a>
-                        <a class="nav-link {% if 'candidate' in view %}active{% endif %}" href="{{ url_for('list_candidates') }}"><i class="bi bi-person-plus-fill"></i> Recrutement</a>
+                        <a class="nav-link {% if 'employee' in view %}active{% endif %}"
+                            href="{{ url_for('list_employees') }}"><i class="bi bi-people-fill"></i> Employés</a>
+                        <a class="nav-link {% if 'leave' in view %}active{% endif %}"
+                            href="{{ url_for('list_leaves') }}"><i class="bi bi-calendar-check-fill"></i> Congés</a>
+                        <a class="nav-link {% if 'candidate' in view %}active{% endif %}"
+                            href="{{ url_for('list_candidates') }}"><i class="bi bi-person-plus-fill"></i>
+                            Recrutement</a>
                     </div>
                     <div class="mt-2">
                         <h3 class="nav-category-title">Opérations</h3>
-                        <a class="nav-link {% if 'chantier' in view %}active{% endif %}" href="{{ url_for('list_chantiers') }}"><i class="bi bi-wrench"></i> Chantiers</a>
-                        <a class="nav-link {% if 'equipment' in view %}active{% endif %}" href="{{ url_for('list_equipment') }}"><i class="bi bi-truck"></i> Équipement</a>
-                        <a class="nav-link {% if 'sav' in view %}active{% endif %}" href="{{ url_for('list_sav') }}"><i class="bi bi-headphones"></i> SAV</a>
+                        <a class="nav-link {% if 'chantier' in view %}active{% endif %}"
+                            href="{{ url_for('list_chantiers') }}"><i class="bi bi-wrench"></i> Chantiers</a>
+                        <a class="nav-link {% if 'equipment' in view %}active{% endif %}"
+                            href="{{ url_for('list_equipment') }}"><i class="bi bi-truck"></i> Équipement</a>
+                        <a class="nav-link {% if 'sav' in view %}active{% endif %}" href="{{ url_for('list_sav') }}"><i
+                                class="bi bi-headphones"></i> SAV</a>
                     </div>
                     <div class="mt-2">
                         <h3 class="nav-category-title">Finances</h3>
-                        <a class="nav-link {% if 'quote' in view %}active{% endif %}" href="{{ url_for('list_quotes') }}"><i class="bi bi-file-earmark-text-fill"></i> Devis</a>
-                        <a class="nav-link {% if 'facture' in view %}active{% endif %}" href="{{ url_for('list_factures') }}"><i class="bi bi-credit-card"></i> Factures</a>
+                        <a class="nav-link {% if 'quote' in view %}active{% endif %}"
+                            href="{{ url_for('list_quotes') }}"><i class="bi bi-file-earmark-text-fill"></i> Devis</a>
+                        <a class="nav-link {% if 'facture' in view %}active{% endif %}"
+                            href="{{ url_for('list_factures') }}"><i class="bi bi-credit-card"></i> Factures</a>
                     </div>
                     <div class="mt-2">
                         <h3 class="nav-category-title">Autres</h3>
-                        <a class="nav-link {% if 'client' in view %}active{% endif %}" href="{{ url_for('list_clients') }}"><i class="bi bi-person-check-fill"></i> Clients</a>
-                        <a class="nav-link {% if 'planning' in view %}active{% endif %}" href="{{ url_for('list_planning') }}"><i class="bi bi-map-fill"></i> Planning</a>
-                        <a class="nav-link {% if 'document' in view %}active{% endif %}" href="{{ url_for('list_documents') }}"><i class="bi bi-folder-fill"></i> Documents</a>
+                        <a class="nav-link {% if 'client' in view %}active{% endif %}"
+                            href="{{ url_for('list_clients') }}"><i class="bi bi-person-check-fill"></i> Clients</a>
+                        <a class="nav-link {% if 'planning' in view %}active{% endif %}"
+                            href="{{ url_for('list_planning') }}"><i class="bi bi-map-fill"></i> Planning</a>
+                        <a class="nav-link {% if 'document' in view %}active{% endif %}"
+                            href="{{ url_for('list_documents') }}"><i class="bi bi-folder-fill"></i> Documents</a>
+                        {% if current_user.role == 'admin' %}
+                        <a class="nav-link {% if 'users' in view %}active{% endif %}"
+                            href="{{ url_for('manage_users') }}"><i class="bi bi-person-gear"></i> Gestion
+                            Utilisateurs</a>
+                        {% endif %}
                     </div>
                 </div>
             </nav>
 
             <div class="sidebar-footer">
-                <a href="{{ url_for('logout') }}" class="btn logout-btn"><i class="bi bi-box-arrow-left"></i> Déconnexion</a>
+                <p class="text-white text-center">Mon rôle : {{ current_user.role }}</p>
+
+                <a href="{{ url_for('logout') }}" class="btn logout-btn"><i class="bi bi-box-arrow-left"></i>
+                    Déconnexion</a>
             </div>
         </aside>
 
@@ -108,94 +131,720 @@
                 {# --- Le contenu des pages commence ici --- #}
 
                 {% if view == 'dashboard' %}
-                    <div class="page-header-mobile-stack"><h1 class="page-title">Dashboard</h1><p class="text-muted mb-4">Aperçu rapide de votre activité.</p></div>
-                    <div class="row"><div class="col-12"><div class="card"><div class="card-header"><i class="bi bi-bell-fill me-2"></i>Alertes & Notifications</div><div class="list-group list-group-flush">{% for alert in alerts %}<div class="list-group-item d-flex justify-content-between align-items-center"><div><span class="badge bg-{{ 'warning' if alert.category == 'Maintenance' else 'info' if alert.category == 'Quote' else 'primary' }} me-2">{{ alert.category }}</span> {{ alert.message }}</div><small class="text-muted">{{ alert.due_date.strftime('%d/%m/%Y') }}</small></div>{% else %}<div class="list-group-item text-center text-muted">Aucune alerte.</div>{% endfor %}</div></div></div></div>
-                    <div class="row mt-4"><div class="col-md-6 mb-4"><div class="card h-100"><div class="card-header"><i class="bi bi-file-earmark-text-fill me-2"></i>Devis en Attente</div><div class="card-body"><ul class="list-group list-group-flush">{% for quote in quotes %}<li class="list-group-item d-flex justify-content-between align-items-center"><a href="{{ url_for('generate_quote_pdf', quote_id=quote.id) }}" target="_blank">#{{ quote.quote_number }}</a><span>{{ quote.client.name }}</span><span class="fw-bold">{{ "%.2f"|format(quote.total_price) }} €</span></li>{% else %}<li class="list-group-item text-center text-muted">Aucun devis.</li>{% endfor %}</ul></div></div></div><div class="col-md-6 mb-4"><div class="card h-100"><div class="card-header"><i class="bi bi-people-fill me-2"></i>Clients Récents</div><div class="card-body"><ul class="list-group list-group-flush">{% for client in clients %}<li class="list-group-item d-flex justify-content-between align-items-center"><a href="{{ url_for('client_profile', client_id=client.id) }}">{{ client.name }}</a><span class="badge bg-secondary">{{ client.status }}</span></li>{% else %}<li class="list-group-item text-center text-muted">Aucun client.</li>{% endfor %}</ul></div></div></div></div>
+                <div class="page-header-mobile-stack">
+                    <h1 class="page-title">Dashboard</h1>
+                    <p class="text-muted mb-4">Aperçu rapide de votre activité.</p>
+                </div>
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header"><i class="bi bi-bell-fill me-2"></i>Alertes & Notifications</div>
+                            <div class="list-group list-group-flush">{% for alert in alerts %}<div
+                                    class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div><span
+                                            class="badge bg-{{ 'warning' if alert.category == 'Maintenance' else 'info' if alert.category == 'Quote' else 'primary' }} me-2">{{
+                                            alert.category }}</span> {{ alert.message }}</div><small
+                                        class="text-muted">{{ alert.due_date.strftime('%d/%m/%Y') }}</small>
+                                </div>{% else %}<div class="list-group-item text-center text-muted">Aucune alerte.</div>
+                                {% endfor %}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-4">
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header"><i class="bi bi-file-earmark-text-fill me-2"></i>Devis en Attente
+                            </div>
+                            <div class="card-body">
+                                <ul class="list-group list-group-flush">{% for quote in quotes %}<li
+                                        class="list-group-item d-flex justify-content-between align-items-center"><a
+                                            href="{{ url_for('generate_quote_pdf', quote_id=quote.id) }}"
+                                            target="_blank">#{{ quote.quote_number }}</a><span>{{ quote.client.name
+                                            }}</span><span class="fw-bold">{{ "%.2f"|format(quote.total_price) }}
+                                            €</span></li>{% else %}<li class="list-group-item text-center text-muted">
+                                        Aucun devis.</li>{% endfor %}</ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header"><i class="bi bi-people-fill me-2"></i>Clients Récents</div>
+                            <div class="card-body">
+                                <ul class="list-group list-group-flush">{% for client in clients %}<li
+                                        class="list-group-item d-flex justify-content-between align-items-center"><a
+                                            href="{{ url_for('client_profile', client_id=client.id) }}">{{ client.name
+                                            }}</a><span class="badge bg-secondary">{{ client.status }}</span></li>{%
+                                    else %}<li class="list-group-item text-center text-muted">Aucun client.</li>{%
+                                    endfor %}</ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 {% elif view == 'clients_list' %}
-                    <div class="d-flex justify-content-between align-items-center mb-4 page-header-mobile-stack"><h1 class="page-title mb-0">Liste des Clients</h1><a href="{{ url_for('add_client') }}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Ajouter un Client</a></div>
-                    <div class="card"><div class="card-body"><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Nom</th><th>Email</th><th>Téléphone</th><th>Status</th><th>Actions</th></tr></thead><tbody>{% for client in clients %}<tr><td><strong>{{ client.name }}</strong></td><td>{{ client.email or '-' }}</td><td>{{ client.phone or '-' }}</td><td><span class="badge bg-info text-dark">{{ client.status }}</span></td><td><a href="{{ url_for('client_profile', client_id=client.id) }}" class="btn btn-sm btn-outline-primary">Voir Profil</a></td></tr>{% else %}<tr><td colspan="5" class="text-center text-muted">Aucun client trouvé.</td></tr>{% endfor %}</tbody></table></div></div></div>
+                <div class="d-flex justify-content-between align-items-center mb-4 page-header-mobile-stack">
+                    <h1 class="page-title mb-0">Liste des Clients</h1><a href="{{ url_for('add_client') }}"
+                        class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Ajouter un Client</a>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Nom</th>
+                                        <th>Email</th>
+                                        <th>Téléphone</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>{% for client in clients %}<tr>
+                                        <td><strong>{{ client.name }}</strong></td>
+                                        <td>{{ client.email or '-' }}</td>
+                                        <td>{{ client.phone or '-' }}</td>
+                                        <td><span class="badge bg-info text-dark">{{ client.status }}</span></td>
+                                        <td><a href="{{ url_for('client_profile', client_id=client.id) }}"
+                                                class="btn btn-sm btn-outline-primary">Voir Profil</a></td>
+                                    </tr>{% else %}<tr>
+                                        <td colspan="5" class="text-center text-muted">Aucun client trouvé.</td>
+                                    </tr>{% endfor %}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
                 {% elif view == 'client_profile' %}
-                    <div class="d-flex justify-content-between align-items-center mb-4 page-header-mobile-stack"><h1 class="page-title mb-0"><i class="bi bi-person-fill me-2"></i>{{ client.name }}</h1><a href="{{ url_for('edit_client', client_id=client.id) }}" class="btn btn-secondary"><i class="bi bi-pencil-fill me-2"></i>Modifier</a></div>
-                    <div class="row"><div class="col-md-4"><div class="card"><div class="card-body"><h5 class="card-title">Informations de Contact</h5><p><strong>Email:</strong> {{ client.email or 'N/A' }}</p><p><strong>Téléphone:</strong> {{ client.phone or 'N/A' }}</p><p><strong>Adresse:</strong> {{ client.address or 'N/A' }}</p><p><strong>Status:</strong> <span class="badge bg-primary">{{ client.status }}</span></p><p class="text-muted"><small>Dernier contact: {{ client.last_contact_date.strftime('%d/%m/%Y') }}</small></p></div></div></div><div class="col-md-8"><div class="card"><div class="card-header">Historique des Devis</div><ul class="list-group list-group-flush">{% for quote in client.quotes %}<li class="list-group-item d-flex justify-content-between align-items-center"><span><a href="{{ url_for('generate_quote_pdf', quote_id=quote.id) }}" target="_blank">#{{ quote.quote_number }}</a> - {{ quote.created_at.strftime('%d/%m/%Y') }}</span><span class="badge bg-{{'success' if quote.status=='Approved' else 'warning' if quote.status=='Pending' else 'danger'}}">{{ quote.status }}</span></li>{% else %}<li class="list-group-item text-muted">Aucun devis pour ce client.</li>{% endfor %}</ul></div></div></div>
+                <div class="d-flex justify-content-between align-items-center mb-4 page-header-mobile-stack">
+                    <h1 class="page-title mb-0"><i class="bi bi-person-fill me-2"></i>{{ client.name }}</h1><a
+                        href="{{ url_for('edit_client', client_id=client.id) }}" class="btn btn-secondary"><i
+                            class="bi bi-pencil-fill me-2"></i>Modifier</a>
+                </div>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Informations de Contact</h5>
+                                <p><strong>Email:</strong> {{ client.email or 'N/A' }}</p>
+                                <p><strong>Téléphone:</strong> {{ client.phone or 'N/A' }}</p>
+                                <p><strong>Adresse:</strong> {{ client.address or 'N/A' }}</p>
+                                <p><strong>Status:</strong> <span class="badge bg-primary">{{ client.status }}</span>
+                                </p>
+                                <p class="text-muted"><small>Dernier contact: {{
+                                        client.last_contact_date.strftime('%d/%m/%Y') }}</small></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header">Historique des Devis</div>
+                            <ul class="list-group list-group-flush">{% for quote in client.quotes %}<li
+                                    class="list-group-item d-flex justify-content-between align-items-center"><span><a
+                                            href="{{ url_for('generate_quote_pdf', quote_id=quote.id) }}"
+                                            target="_blank">#{{ quote.quote_number }}</a> - {{
+                                        quote.created_at.strftime('%d/%m/%Y') }}</span><span
+                                        class="badge bg-{{'success' if quote.status=='Approved' else 'warning' if quote.status=='Pending' else 'danger'}}">{{
+                                        quote.status }}</span></li>{% else %}<li class="list-group-item text-muted">
+                                    Aucun devis pour ce client.</li>{% endfor %}</ul>
+                        </div>
+                    </div>
+                </div>
                 {% elif view == 'client_form' %}
-                    <div class="page-header-mobile-stack mb-4"><h1 class="page-title">{{ form_title }}</h1></div>
-                    <div class="card"><div class="card-body"><form method="POST"><div class="mb-3"><label for="name" class="form-label">Nom Complet</label><input type="text" class="form-control" id="name" name="name" value="{{ client.name if client else '' }}" required></div><div class="row"><div class="col-md-6 mb-3"><label for="email" class="form-label">Email</label><input type="email" class="form-control" id="email" name="email" value="{{ client.email if client else '' }}"></div><div class="col-md-6 mb-3"><label for="phone" class="form-label">Téléphone</label><input type="tel" class="form-control" id="phone" name="phone" value="{{ client.phone if client else '' }}"></div></div><div class="mb-3"><label for="address" class="form-label">Adresse</label><textarea class="form-control" id="address" name="address" rows="3">{{ client.address if client else '' }}</textarea></div><div class="mb-3"><label for="status" class="form-label">Status</label><select class="form-select" id="status" name="status">{% set statuses = ['Prospect', 'Ongoing', 'Completed', 'Needs Follow-up'] %}{% for status in statuses %}<option value="{{ status }}" {% if client and client.status == status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></div><button type="submit" class="btn btn-primary">Enregistrer</button><a href="{{ url_for('list_clients') }}" class="btn btn-light">Annuler</a></form></div></div>
+                <div class="page-header-mobile-stack mb-4">
+                    <h1 class="page-title">{{ form_title }}</h1>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <form method="POST">
+                            <div class="mb-3"><label for="name" class="form-label">Nom Complet</label><input type="text"
+                                    class="form-control" id="name" name="name"
+                                    value="{{ client.name if client else '' }}" required></div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3"><label for="email" class="form-label">Email</label><input
+                                        type="email" class="form-control" id="email" name="email"
+                                        value="{{ client.email if client else '' }}"></div>
+                                <div class="col-md-6 mb-3"><label for="phone" class="form-label">Téléphone</label><input
+                                        type="tel" class="form-control" id="phone" name="phone"
+                                        value="{{ client.phone if client else '' }}"></div>
+                            </div>
+                            <div class="mb-3"><label for="address" class="form-label">Adresse</label><textarea
+                                    class="form-control" id="address" name="address"
+                                    rows="3">{{ client.address if client else '' }}</textarea></div>
+                            <div class="mb-3"><label for="status" class="form-label">Status</label><select
+                                    class="form-select" id="status" name="status">{% set statuses = ['Prospect',
+                                    'Ongoing', 'Completed', 'Needs Follow-up'] %}{% for status in statuses %}<option
+                                        value="{{ status }}" {% if client and client.status==status %}selected{% endif
+                                        %}>{{ status }}</option>{% endfor %}</select></div><button type="submit"
+                                class="btn btn-primary">Enregistrer</button><a href="{{ url_for('list_clients') }}"
+                                class="btn btn-light">Annuler</a>
+                        </form>
+                    </div>
+                </div>
 
                 {% elif view == 'equipment_list' %}
-                    <div class="d-flex justify-content-between align-items-center mb-4 page-header-mobile-stack"><h1 class="page-title mb-0">Gestion de l'Équipement</h1><a href="{{ url_for('add_equipment') }}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Ajouter</a></div>
-                    <div class="card mb-3"><div class="card-body"><form class="row g-2 align-items-end" method="GET"><div class="col-auto"><label for="status" class="form-label">Filtrer par statut:</label><select class="form-select" id="status" name="status" onchange="this.form.submit()"><option value="all" {% if current_filter == 'all' %}selected{% endif %}>Tous</option><option value="In Service" {% if current_filter == 'In Service' %}selected{% endif %}>In Service</option><option value="Broken" {% if current_filter == 'Broken' %}selected{% endif %}>Broken</option><option value="Out of Order" {% if current_filter == 'Out of Order' %}selected{% endif %}>Out of Order</option></select></div></form></div></div>
-                    <div class="card"><div class="card-body"><div class="table-responsive"><table class="table table-hover"><thead><tr><th>Nom</th><th>Marque/Modèle</th><th>N° de Série</th><th>Prochaine Maintenance</th><th>Statut</th></tr></thead><tbody>{% for item in equipment %}<tr><td><strong>{{ item.name }}</strong></td><td>{{ item.brand or '' }} / {{ item.model or '' }}</td><td>{{ item.serial_number }}</td><td>{{ item.next_maintenance_date.strftime('%d/%m/%Y') if item.next_maintenance_date else '-' }}</td><td><span class="badge bg-{{'success' if item.status=='In Service' else 'danger'}}">{{ item.status }}</span></td></tr>{% else %}<tr><td colspan="5" class="text-center text-muted">Aucun équipement trouvé.</td></tr>{% endfor %}</tbody></table></div></div></div>
+                <div class="d-flex justify-content-between align-items-center mb-4 page-header-mobile-stack">
+                    <h1 class="page-title mb-0">Gestion de l'Équipement</h1><a href="{{ url_for('add_equipment') }}"
+                        class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Ajouter</a>
+                </div>
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <form class="row g-2 align-items-end" method="GET">
+                            <div class="col-auto"><label for="status" class="form-label">Filtrer par
+                                    statut:</label><select class="form-select" id="status" name="status"
+                                    onchange="this.form.submit()">
+                                    <option value="all" {% if current_filter=='all' %}selected{% endif %}>Tous</option>
+                                    <option value="In Service" {% if current_filter=='In Service' %}selected{% endif %}>
+                                        In Service</option>
+                                    <option value="Broken" {% if current_filter=='Broken' %}selected{% endif %}>Broken
+                                    </option>
+                                    <option value="Out of Order" {% if current_filter=='Out of Order' %}selected{% endif
+                                        %}>Out of Order</option>
+                                </select></div>
+                        </form>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Nom</th>
+                                        <th>Marque/Modèle</th>
+                                        <th>N° de Série</th>
+                                        <th>Prochaine Maintenance</th>
+                                        <th>Statut</th>
+                                    </tr>
+                                </thead>
+                                <tbody>{% for item in equipment %}<tr>
+                                        <td><strong>{{ item.name }}</strong></td>
+                                        <td>{{ item.brand or '' }} / {{ item.model or '' }}</td>
+                                        <td>{{ item.serial_number }}</td>
+                                        <td>{{ item.next_maintenance_date.strftime('%d/%m/%Y') if
+                                            item.next_maintenance_date else '-' }}</td>
+                                        <td><span
+                                                class="badge bg-{{'success' if item.status=='In Service' else 'danger'}}">{{
+                                                item.status }}</span></td>
+                                    </tr>{% else %}<tr>
+                                        <td colspan="5" class="text-center text-muted">Aucun équipement trouvé.</td>
+                                    </tr>{% endfor %}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
                 {% elif view == 'equipment_form' %}
-                    <div class="page-header-mobile-stack mb-4"><h1 class="page-title">Ajouter un Équipement</h1></div>
-                    <div class="card"><div class="card-body"><form method="POST" action="{{ url_for('add_equipment') }}"><div class="row"><div class="col-md-6 mb-3"><label for="name" class="form-label">Nom</label><input type="text" class="form-control" id="name" name="name" required></div><div class="col-md-6 mb-3"><label for="serial_number" class="form-label">N° de Série</label><input type="text" class="form-control" id="serial_number" name="serial_number"></div></div><div class="row"><div class="col-md-6 mb-3"><label for="brand" class="form-label">Marque</label><input type="text" class="form-control" id="brand" name="brand"></div><div class="col-md-6 mb-3"><label for="model" class="form-label">Modèle</label><input type="text" class="form-control" id="model" name="model"></div></div><div class="row"><div class="col-md-6 mb-3"><label for="last_maintenance_date" class="form-label">Dernière Maintenance</label><input type="date" class="form-control" id="last_maintenance_date" name="last_maintenance_date"></div><div class="col-md-6 mb-3"><label for="next_maintenance_date" class="form-label">Prochaine Maintenance</label><input type="date" class="form-control" id="next_maintenance_date" name="next_maintenance_date"></div></div><div class="mb-3"><label for="status" class="form-label">Statut</label><select class="form-select" id="status" name="status"><option value="In Service">In Service</option><option value="Broken">Broken</option><option value="Out of Order">Out of Order</option></select></div><button type="submit" class="btn btn-primary">Enregistrer</button></form></div></div>
+                <div class="page-header-mobile-stack mb-4">
+                    <h1 class="page-title">Ajouter un Équipement</h1>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <form method="POST" action="{{ url_for('add_equipment') }}">
+                            <div class="row">
+                                <div class="col-md-6 mb-3"><label for="name" class="form-label">Nom</label><input
+                                        type="text" class="form-control" id="name" name="name" required></div>
+                                <div class="col-md-6 mb-3"><label for="serial_number" class="form-label">N° de
+                                        Série</label><input type="text" class="form-control" id="serial_number"
+                                        name="serial_number"></div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3"><label for="brand" class="form-label">Marque</label><input
+                                        type="text" class="form-control" id="brand" name="brand"></div>
+                                <div class="col-md-6 mb-3"><label for="model" class="form-label">Modèle</label><input
+                                        type="text" class="form-control" id="model" name="model"></div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3"><label for="last_maintenance_date"
+                                        class="form-label">Dernière Maintenance</label><input type="date"
+                                        class="form-control" id="last_maintenance_date" name="last_maintenance_date">
+                                </div>
+                                <div class="col-md-6 mb-3"><label for="next_maintenance_date"
+                                        class="form-label">Prochaine Maintenance</label><input type="date"
+                                        class="form-control" id="next_maintenance_date" name="next_maintenance_date">
+                                </div>
+                            </div>
+                            <div class="mb-3"><label for="status" class="form-label">Statut</label><select
+                                    class="form-select" id="status" name="status">
+                                    <option value="In Service">In Service</option>
+                                    <option value="Broken">Broken</option>
+                                    <option value="Out of Order">Out of Order</option>
+                                </select></div><button type="submit" class="btn btn-primary">Enregistrer</button>
+                        </form>
+                    </div>
+                </div>
 
                 {% elif view == 'quote_list' %}
-                    <div class="d-flex justify-content-between align-items-center mb-4 page-header-mobile-stack"><h1 class="page-title mb-0">Liste des Devis</h1><a href="{{ url_for('add_quote') }}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Créer un Devis</a></div>
-                    <div class="card"><div class="card-body"><div class="table-responsive"><table class="table"><thead><tr><th>Numéro</th><th>Client</th><th>Date</th><th>Total TTC</th><th>Statut</th><th>Actions</th></tr></thead><tbody>{% for quote in quotes %}<tr><td><strong>{{ quote.quote_number }}</strong></td><td>{{ quote.client.name }}</td><td>{{ quote.created_at.strftime('%d/%m/%Y') }}</td><td>{{ "%.2f"|format(quote.total_price) }} €</td><td><span class="badge bg-{{'success' if quote.status=='Approved' else 'warning' if quote.status=='Pending' else 'danger'}}">{{ quote.status }}</span></td><td><a href="{{ url_for('generate_quote_pdf', quote_id=quote.id) }}" target="_blank" class="btn btn-sm btn-outline-danger"><i class="bi bi-file-pdf-fill"></i> PDF</a></td></tr>{% else %}<tr><td colspan="6" class="text-center text-muted">Aucun devis trouvé.</td></tr>{% endfor %}</tbody></table></div></div></div>
+                <div class="d-flex justify-content-between align-items-center mb-4 page-header-mobile-stack">
+                    <h1 class="page-title mb-0">Liste des Devis</h1><a href="{{ url_for('add_quote') }}"
+                        class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Créer un Devis</a>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Numéro</th>
+                                        <th>Client</th>
+                                        <th>Date</th>
+                                        <th>Total TTC</th>
+                                        <th>Statut</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>{% for quote in quotes %}<tr>
+                                        <td><strong>{{ quote.quote_number }}</strong></td>
+                                        <td>{{ quote.client.name }}</td>
+                                        <td>{{ quote.created_at.strftime('%d/%m/%Y') }}</td>
+                                        <td>{{ "%.2f"|format(quote.total_price) }} €</td>
+                                        <td><span
+                                                class="badge bg-{{'success' if quote.status=='Approved' else 'warning' if quote.status=='Pending' else 'danger'}}">{{
+                                                quote.status }}</span></td>
+                                        <td><a href="{{ url_for('generate_quote_pdf', quote_id=quote.id) }}"
+                                                target="_blank" class="btn btn-sm btn-outline-danger"><i
+                                                    class="bi bi-file-pdf-fill"></i> PDF</a></td>
+                                    </tr>{% else %}<tr>
+                                        <td colspan="6" class="text-center text-muted">Aucun devis trouvé.</td>
+                                    </tr>{% endfor %}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
                 {% elif view == 'quote_form' %}
-                    <div class="page-header-mobile-stack mb-4"><h1 class="page-title">Générateur de Devis</h1></div>
-                    <div class="card"><div class="card-body"><form method="POST"><div class="row"><div class="col-md-6 mb-3"><label for="client_id" class="form-label">Client</label><select class="form-select" id="client_id" name="client_id" required><option value="">Sélectionner un client...</option>{% for client in clients %}<option value="{{ client.id }}">{{ client.name }}</option>{% endfor %}</select></div><div class="col-md-6 mb-3"><label for="service_type" class="form-label">Type de Service</label><input type="text" class="form-control" id="service_type" name="service_type" placeholder="Ex: Réparation, Location" required></div></div><div class="mb-3"><label for="details" class="form-label">Détails des services</label><textarea class="form-control" id="details" name="details" rows="4" required></textarea></div><div class="row"><div class="col-md-6 mb-3"><label for="price" class="form-label">Prix HT</label><div class="input-group"><input type="number" step="0.01" class="form-control" id="price" name="price" required><span class="input-group-text">€</span></div></div><div class="col-md-6 mb-3"><label for="vat_rate" class="form-label">TVA</label><select class="form-select" id="vat_rate" name="vat_rate"><option value="0.20">20%</option><option value="0.10">10%</option><option value="0.055">5.5%</option><option value="0">0%</option></select></div></div><button type="submit" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Créer le devis</button></form></div></div>
-                
+                <div class="page-header-mobile-stack mb-4">
+                    <h1 class="page-title">Générateur de Devis</h1>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <form method="POST">
+                            <div class="row">
+                                <div class="col-md-6 mb-3"><label for="client_id"
+                                        class="form-label">Client</label><select class="form-select" id="client_id"
+                                        name="client_id" required>
+                                        <option value="">Sélectionner un client...</option>{% for client in clients %}
+                                        <option value="{{ client.id }}">{{ client.name }}</option>{% endfor %}
+                                    </select></div>
+                                <div class="col-md-6 mb-3"><label for="service_type" class="form-label">Type de
+                                        Service</label><input type="text" class="form-control" id="service_type"
+                                        name="service_type" placeholder="Ex: Réparation, Location" required></div>
+                            </div>
+                            <div class="mb-3"><label for="details" class="form-label">Détails des
+                                    services</label><textarea class="form-control" id="details" name="details" rows="4"
+                                    required></textarea></div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3"><label for="price" class="form-label">Prix HT</label>
+                                    <div class="input-group"><input type="number" step="0.01" class="form-control"
+                                            id="price" name="price" required><span class="input-group-text">€</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3"><label for="vat_rate" class="form-label">TVA</label><select
+                                        class="form-select" id="vat_rate" name="vat_rate">
+                                        <option value="0.20">20%</option>
+                                        <option value="0.10">10%</option>
+                                        <option value="0.055">5.5%</option>
+                                        <option value="0">0%</option>
+                                    </select></div>
+                            </div><button type="submit" class="btn btn-primary"><i
+                                    class="bi bi-plus-circle-fill me-2"></i>Créer le devis</button>
+                        </form>
+                    </div>
+                </div>
+
                 {% elif view == 'employees_list' %}
-                    <div class="d-flex justify-content-between align-items-center mb-4 page-header-mobile-stack"><h1 class="page-title mb-0">Gestion des Employés</h1><a href="{{ url_for('add_employee') }}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Ajouter un Employé</a></div>
-                    <div class="card"><div class="card-body"><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Nom Complet</th><th>Poste</th><th>Email</th><th>Téléphone</th><th>Date d'Embauche</th><th>Salaire Annuel</th><th>Actions</th></tr></thead><tbody>{% for employee in employees %}<tr><td><strong>{{ employee.full_name }}</strong></td><td>{{ employee.position }}</td><td>{{ employee.email or '-' }}</td><td>{{ employee.phone or '-' }}</td><td>{{ employee.hire_date.strftime('%d/%m/%Y') }}</td><td>{% if employee.salary %}{{ "%.2f"|format(employee.salary) }} €{% else %}-{% endif %}</td><td><a href="{{ url_for('edit_employee', employee_id=employee.id) }}" class="btn btn-sm btn-outline-secondary">Modifier</a></td></tr>{% else %}<tr><td colspan="7" class="text-center text-muted">Aucun employé trouvé.</td></tr>{% endfor %}</tbody></table></div></div></div>
+                <div class="d-flex justify-content-between align-items-center mb-4 page-header-mobile-stack">
+                    <h1 class="page-title mb-0">Gestion des Employés</h1><a href="{{ url_for('add_employee') }}"
+                        class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Ajouter un Employé</a>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Nom Complet</th>
+                                        <th>Poste</th>
+                                        <th>Email</th>
+                                        <th>Téléphone</th>
+                                        <th>Date d'Embauche</th>
+                                        <th>Salaire Annuel</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>{% for employee in employees %}<tr>
+                                        <td><strong>{{ employee.full_name }}</strong></td>
+                                        <td>{{ employee.position }}</td>
+                                        <td>{{ employee.email or '-' }}</td>
+                                        <td>{{ employee.phone or '-' }}</td>
+                                        <td>{{ employee.hire_date.strftime('%d/%m/%Y') }}</td>
+                                        <td>{% if employee.salary %}{{ "%.2f"|format(employee.salary) }} €{% else %}-{%
+                                            endif %}</td>
+                                        <td><a href="{{ url_for('edit_employee', employee_id=employee.id) }}"
+                                                class="btn btn-sm btn-outline-secondary">Modifier</a></td>
+                                    </tr>{% else %}<tr>
+                                        <td colspan="7" class="text-center text-muted">Aucun employé trouvé.</td>
+                                    </tr>{% endfor %}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
                 {% elif view == 'employee_form' %}
-                    <div class="page-header-mobile-stack mb-4"><h1 class="page-title">{{ form_title }}</h1></div>
-                    <div class="card"><div class="card-body"><form method="POST"><div class="row"><div class="col-md-6 mb-3"><label for="full_name" class="form-label">Nom Complet</label><input type="text" class="form-control" id="full_name" name="full_name" value="{{ employee.full_name if employee else '' }}" required></div><div class="col-md-6 mb-3"><label for="position" class="form-label">Poste</label><input type="text" class="form-control" id="position" name="position" value="{{ employee.position if employee else '' }}" placeholder="Ex: Technicien" required></div></div><div class="row"><div class="col-md-6 mb-3"><label for="email" class="form-label">Email</label><input type="email" class="form-control" id="email" name="email" value="{{ employee.email if employee else '' }}"></div><div class="col-md-6 mb-3"><label for="phone" class="form-label">Téléphone</label><input type="tel" class="form-control" id="phone" name="phone" value="{{ employee.phone if employee else '' }}"></div></div><div class="row"><div class="col-md-6 mb-3"><label for="hire_date" class="form-label">Date d'Embauche</label><input type="date" class="form-control" id="hire_date" name="hire_date" value="{{ employee.hire_date.strftime('%Y-%m-%d') if employee and employee.hire_date else '' }}" required></div><div class="col-md-6 mb-3"><label for="salary" class="form-label">Salaire Annuel Brut</label><div class="input-group"><input type="number" step="0.01" class="form-control" id="salary" name="salary" value="{{ employee.salary if employee else '' }}"><span class="input-group-text">€</span></div></div></div><button type="submit" class="btn btn-primary">Enregistrer</button><a href="{{ url_for('list_employees') }}" class="btn btn-light">Annuler</a></form></div></div>
+                <div class="page-header-mobile-stack mb-4">
+                    <h1 class="page-title">{{ form_title }}</h1>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <form method="POST">
+                            <div class="row">
+                                <div class="col-md-6 mb-3"><label for="full_name" class="form-label">Nom
+                                        Complet</label><input type="text" class="form-control" id="full_name"
+                                        name="full_name" value="{{ employee.full_name if employee else '' }}" required>
+                                </div>
+                                <div class="col-md-6 mb-3"><label for="position" class="form-label">Poste</label><input
+                                        type="text" class="form-control" id="position" name="position"
+                                        value="{{ employee.position if employee else '' }}" placeholder="Ex: Technicien"
+                                        required></div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3"><label for="email" class="form-label">Email</label><input
+                                        type="email" class="form-control" id="email" name="email"
+                                        value="{{ employee.email if employee else '' }}"></div>
+                                <div class="col-md-6 mb-3"><label for="phone" class="form-label">Téléphone</label><input
+                                        type="tel" class="form-control" id="phone" name="phone"
+                                        value="{{ employee.phone if employee else '' }}"></div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3"><label for="hire_date" class="form-label">Date
+                                        d'Embauche</label><input type="date" class="form-control" id="hire_date"
+                                        name="hire_date"
+                                        value="{{ employee.hire_date.strftime('%Y-%m-%d') if employee and employee.hire_date else '' }}"
+                                        required></div>
+                                <div class="col-md-6 mb-3"><label for="salary" class="form-label">Salaire Annuel
+                                        Brut</label>
+                                    <div class="input-group"><input type="number" step="0.01" class="form-control"
+                                            id="salary" name="salary"
+                                            value="{{ employee.salary if employee else '' }}"><span
+                                            class="input-group-text">€</span></div>
+                                </div>
+                            </div><button type="submit" class="btn btn-primary">Enregistrer</button><a
+                                href="{{ url_for('list_employees') }}" class="btn btn-light">Annuler</a>
+                        </form>
+                    </div>
+                </div>
 
                 {% elif view == 'leaves_list' %}
-                    <div class="d-flex justify-content-between align-items-center mb-4 page-header-mobile-stack"><h1 class="page-title mb-0">Gestion des Congés</h1><a href="{{ url_for('request_leave') }}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Nouvelle Demande</a></div>
-                    <div class="card"><div class="card-body"><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Employé</th><th>Type</th><th>Dates</th><th>Durée</th><th>Status</th><th>Actions</th></tr></thead><tbody>{% for leave in leaves %}<tr><td><strong>{{ leave.employee.full_name }}</strong></td><td>{{ leave.leave_type }}</td><td>{{ leave.start_date.strftime('%d/%m/%Y') }} - {{ leave.end_date.strftime('%d/%m/%Y') }}</td><td>{{ (leave.end_date - leave.start_date).days + 1 }} jours</td><td><span class="badge bg-{{'success' if leave.status=='Approved' else 'warning' if leave.status=='Pending' else 'danger'}}">{{ leave.status }}</span></td><td>{% if leave.status == 'Pending' %}<form action="{{ url_for('update_leave_status', leave_id=leave.id) }}" method="POST" class="d-inline"><button type="submit" name="status" value="Approved" class="btn btn-sm btn-success">Approuver</button></form><form action="{{ url_for('update_leave_status', leave_id=leave.id) }}" method="POST" class="d-inline"><button type="submit" name="status" value="Rejected" class="btn btn-sm btn-danger">Rejeter</button></form>{% else %}-{% endif %}</td></tr>{% else %}<tr><td colspan="6" class="text-center text-muted">Aucune demande de congé trouvée.</td></tr>{% endfor %}</tbody></table></div></div></div>
+                <div class="d-flex justify-content-between align-items-center mb-4 page-header-mobile-stack">
+                    <h1 class="page-title mb-0">Gestion des Congés</h1><a href="{{ url_for('request_leave') }}"
+                        class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Nouvelle Demande</a>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Employé</th>
+                                        <th>Type</th>
+                                        <th>Dates</th>
+                                        <th>Durée</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>{% for leave in leaves %}<tr>
+                                        <td><strong>{{ leave.employee.full_name }}</strong></td>
+                                        <td>{{ leave.leave_type }}</td>
+                                        <td>{{ leave.start_date.strftime('%d/%m/%Y') }} - {{
+                                            leave.end_date.strftime('%d/%m/%Y') }}</td>
+                                        <td>{{ (leave.end_date - leave.start_date).days + 1 }} jours</td>
+                                        <td><span
+                                                class="badge bg-{{'success' if leave.status=='Approved' else 'warning' if leave.status=='Pending' else 'danger'}}">{{
+                                                leave.status }}</span></td>
+                                        <td>{% if leave.status == 'Pending' %}<form
+                                                action="{{ url_for('update_leave_status', leave_id=leave.id) }}"
+                                                method="POST" class="d-inline"><button type="submit" name="status"
+                                                    value="Approved" class="btn btn-sm btn-success">Approuver</button>
+                                            </form>
+                                            <form action="{{ url_for('update_leave_status', leave_id=leave.id) }}"
+                                                method="POST" class="d-inline"><button type="submit" name="status"
+                                                    value="Rejected" class="btn btn-sm btn-danger">Rejeter</button>
+                                            </form>{% else %}-{% endif %}
+                                        </td>
+                                    </tr>{% else %}<tr>
+                                        <td colspan="6" class="text-center text-muted">Aucune demande de congé trouvée.
+                                        </td>
+                                    </tr>{% endfor %}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
                 {% elif view == 'leave_request_form' %}
-                    <div class="page-header-mobile-stack mb-4"><h1 class="page-title">{{ form_title }}</h1></div>
-                    <div class="card"><div class="card-body"><form method="POST"><div class="mb-3"><label for="employee_id" class="form-label">Employé</label><select class="form-select" id="employee_id" name="employee_id" required><option value="">Sélectionner un employé...</option>{% for employee in employees %}<option value="{{ employee.id }}">{{ employee.full_name }}</option>{% endfor %}</select></div><div class="mb-3"><label for="leave_type" class="form-label">Type de Congé</label><select class="form-select" id="leave_type" name="leave_type"><option value="Annual Leave">Congé Annuel</option><option value="Sick Leave">Arrêt Maladie</option><option value="Unpaid Leave">Congé sans Solde</option><option value="Special">Congé Exceptionnel</option></select></div><div class="row"><div class="col-md-6 mb-3"><label for="start_date" class="form-label">Date de Début</label><input type="date" class="form-control" id="start_date" name="start_date" required></div><div class="col-md-6 mb-3"><label for="end_date" class="form-label">Date de Fin</label><input type="date" class="form-control" id="end_date" name="end_date" required></div></div><div class="mb-3"><label for="reason" class="form-label">Raison (Optionnel)</label><textarea class="form-control" id="reason" name="reason" rows="3"></textarea></div><button type="submit" class="btn btn-primary">Soumettre la Demande</button><a href="{{ url_for('list_leaves') }}" class="btn btn-light">Annuler</a></form></div></div>
+                <div class="page-header-mobile-stack mb-4">
+                    <h1 class="page-title">{{ form_title }}</h1>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <form method="POST">
+                            <div class="mb-3"><label for="employee_id" class="form-label">Employé</label><select
+                                    class="form-select" id="employee_id" name="employee_id" required>
+                                    <option value="">Sélectionner un employé...</option>{% for employee in employees %}
+                                    <option value="{{ employee.id }}">{{ employee.full_name }}</option>{% endfor %}
+                                </select></div>
+                            <div class="mb-3"><label for="leave_type" class="form-label">Type de Congé</label><select
+                                    class="form-select" id="leave_type" name="leave_type">
+                                    <option value="Annual Leave">Congé Annuel</option>
+                                    <option value="Sick Leave">Arrêt Maladie</option>
+                                    <option value="Unpaid Leave">Congé sans Solde</option>
+                                    <option value="Special">Congé Exceptionnel</option>
+                                </select></div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3"><label for="start_date" class="form-label">Date de
+                                        Début</label><input type="date" class="form-control" id="start_date"
+                                        name="start_date" required></div>
+                                <div class="col-md-6 mb-3"><label for="end_date" class="form-label">Date de
+                                        Fin</label><input type="date" class="form-control" id="end_date" name="end_date"
+                                        required></div>
+                            </div>
+                            <div class="mb-3"><label for="reason" class="form-label">Raison (Optionnel)</label><textarea
+                                    class="form-control" id="reason" name="reason" rows="3"></textarea></div><button
+                                type="submit" class="btn btn-primary">Soumettre la Demande</button><a
+                                href="{{ url_for('list_leaves') }}" class="btn btn-light">Annuler</a>
+                        </form>
+                    </div>
+                </div>
 
                 {% elif view == 'candidates_list' %}
-                    <div class="d-flex justify-content-between align-items-center mb-4 page-header-mobile-stack"><h1 class="page-title mb-0">Recrutement - Candidats</h1><a href="{{ url_for('add_candidate') }}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Nouveau Candidat</a></div>
-                    <div class="card"><div class="card-body"><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Nom Complet</th><th>Poste Visé</th><th>Date d'Application</th><th>Statut</th><th>Actions</th></tr></thead><tbody>{% for candidate in candidates %}<tr><td><strong>{{ candidate.full_name }}</strong></td><td>{{ candidate.position_applied_for }}</td><td>{{ candidate.application_date.strftime('%d/%m/%Y') }}</td><td>{% set status_colors = {'Applied': 'primary', 'Shortlisted': 'info', 'Interview': 'secondary', 'Offer': 'warning', 'Hired': 'success', 'Rejected': 'danger'} %}<span class="badge bg-{{ status_colors.get(candidate.status, 'light') }}">{{ candidate.status }}</span></td><td><a href="{{ url_for('view_candidate', candidate_id=candidate.id) }}" class="btn btn-sm btn-outline-primary">Voir Profil</a></td></tr>{% else %}<tr><td colspan="5" class="text-center text-muted">Aucun candidat trouvé.</td></tr>{% endfor %}</tbody></table></div></div></div>
+                <div class="d-flex justify-content-between align-items-center mb-4 page-header-mobile-stack">
+                    <h1 class="page-title mb-0">Recrutement - Candidats</h1><a href="{{ url_for('add_candidate') }}"
+                        class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Nouveau Candidat</a>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Nom Complet</th>
+                                        <th>Poste Visé</th>
+                                        <th>Date d'Application</th>
+                                        <th>Statut</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>{% for candidate in candidates %}<tr>
+                                        <td><strong>{{ candidate.full_name }}</strong></td>
+                                        <td>{{ candidate.position_applied_for }}</td>
+                                        <td>{{ candidate.application_date.strftime('%d/%m/%Y') }}</td>
+                                        <td>{% set status_colors = {'Applied': 'primary', 'Shortlisted': 'info',
+                                            'Interview': 'secondary', 'Offer': 'warning', 'Hired': 'success',
+                                            'Rejected': 'danger'} %}<span
+                                                class="badge bg-{{ status_colors.get(candidate.status, 'light') }}">{{
+                                                candidate.status }}</span></td>
+                                        <td><a href="{{ url_for('view_candidate', candidate_id=candidate.id) }}"
+                                                class="btn btn-sm btn-outline-primary">Voir Profil</a></td>
+                                    </tr>{% else %}<tr>
+                                        <td colspan="5" class="text-center text-muted">Aucun candidat trouvé.</td>
+                                    </tr>{% endfor %}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
                 {% elif view == 'candidate_profile' %}
-                    <div class="page-header-mobile-stack mb-4"><h1 class="page-title"><i class="bi bi-person-fill me-2"></i>Profil du Candidat</h1></div>
-                    <div class="row"><div class="col-md-7"><div class="card"><div class="card-header">Informations sur le Candidat</div><div class="card-body"><h3>{{ candidate.full_name }}</h3><p class="text-muted">Poste: {{ candidate.position_applied_for }}</p><hr><p><strong>Email:</strong> {{ candidate.email }}</p><p><strong>Téléphone:</strong> {{ candidate.phone or 'N/A' }}</p><p><strong>Date d'application:</strong> {{ candidate.application_date.strftime('%d %B %Y') }}</p><p><strong>Notes / CV:</strong></p><pre class="bg-light p-3 rounded">{{ candidate.notes or 'Aucune note.' }}</pre></div></div></div><div class="col-md-5"><div class="card"><div class="card-header">Gérer le Statut</div><div class="card-body"><form method="POST"><div class="mb-3"><label for="status" class="form-label">Étape du recrutement</label><select class="form-select" id="status" name="status">{% set statuses = ['Applied', 'Shortlisted', 'Interview', 'Offer', 'Hired', 'Rejected'] %}{% for s in statuses %}<option value="{{ s }}" {% if candidate.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div><div class="mb-3"><label for="notes" class="form-label">Mettre à jour les notes</label><textarea class="form-control" name="notes" rows="4">{{ candidate.notes or '' }}</textarea></div><div class="d-grid gap-2"><button type="submit" class="btn btn-info">Mettre à jour</button>{% if candidate.status == 'Hired' %}<a href="{{ url_for('convert_to_employee', candidate_id=candidate.id) }}" class="btn btn-success"><i class="bi bi-arrow-right-circle-fill me-2"></i>Convertir en Employé</a>{% endif %}</div></form></div></div></div></div>
+                <div class="page-header-mobile-stack mb-4">
+                    <h1 class="page-title"><i class="bi bi-person-fill me-2"></i>Profil du Candidat</h1>
+                </div>
+                <div class="row">
+                    <div class="col-md-7">
+                        <div class="card">
+                            <div class="card-header">Informations sur le Candidat</div>
+                            <div class="card-body">
+                                <h3>{{ candidate.full_name }}</h3>
+                                <p class="text-muted">Poste: {{ candidate.position_applied_for }}</p>
+                                <hr>
+                                <p><strong>Email:</strong> {{ candidate.email }}</p>
+                                <p><strong>Téléphone:</strong> {{ candidate.phone or 'N/A' }}</p>
+                                <p><strong>Date d'application:</strong> {{ candidate.application_date.strftime('%d %B
+                                    %Y') }}</p>
+                                <p><strong>Notes / CV:</strong></p>
+                                <pre class="bg-light p-3 rounded">{{ candidate.notes or 'Aucune note.' }}</pre>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <div class="card">
+                            <div class="card-header">Gérer le Statut</div>
+                            <div class="card-body">
+                                <form method="POST">
+                                    <div class="mb-3"><label for="status" class="form-label">Étape du
+                                            recrutement</label><select class="form-select" id="status" name="status">{%
+                                            set statuses = ['Applied', 'Shortlisted', 'Interview', 'Offer', 'Hired',
+                                            'Rejected'] %}{% for s in statuses %}<option value="{{ s }}" {% if
+                                                candidate.status==s %}selected{% endif %}>{{ s }}</option>{% endfor
+                                            %}</select></div>
+                                    <div class="mb-3"><label for="notes" class="form-label">Mettre à jour les
+                                            notes</label><textarea class="form-control" name="notes"
+                                            rows="4">{{ candidate.notes or '' }}</textarea></div>
+                                    <div class="d-grid gap-2"><button type="submit" class="btn btn-info">Mettre à
+                                            jour</button>{% if candidate.status == 'Hired' %}<a
+                                            href="{{ url_for('convert_to_employee', candidate_id=candidate.id) }}"
+                                            class="btn btn-success"><i
+                                                class="bi bi-arrow-right-circle-fill me-2"></i>Convertir en
+                                            Employé</a>{% endif %}</div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 {% elif view == 'candidate_form' %}
-                    <div class="page-header-mobile-stack mb-4"><h1 class="page-title">{{ form_title }}</h1></div>
-                    <div class="card"><div class="card-body"><form method="POST"><div class="row"><div class="col-md-6 mb-3"><label for="full_name" class="form-label">Nom Complet</label><input type="text" class="form-control" id="full_name" name="full_name" required></div><div class="col-md-6 mb-3"><label for="position_applied_for" class="form-label">Poste Visé</label><input type="text" class="form-control" id="position_applied_for" name="position_applied_for" required></div></div><div class="row"><div class="col-md-6 mb-3"><label for="email" class="form-label">Email</label><input type="email" class="form-control" id="email" name="email" required></div><div class="col-md-6 mb-3"><label for="phone" class="form-label">Téléphone</label><input type="tel" class="form-control" id="phone" name="phone"></div></div><div class="mb-3"><label for="notes" class="form-label">Notes / CV</label><textarea class="form-control" id="notes" name="notes" rows="5" placeholder="Coller le CV ou ajouter des notes ici..."></textarea></div><button type="submit" class="btn btn-primary">Enregistrer Candidat</button><a href="{{ url_for('list_candidates') }}" class="btn btn-light">Annuler</a></form></div></div>
+                <div class="page-header-mobile-stack mb-4">
+                    <h1 class="page-title">{{ form_title }}</h1>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <form method="POST">
+                            <div class="row">
+                                <div class="col-md-6 mb-3"><label for="full_name" class="form-label">Nom
+                                        Complet</label><input type="text" class="form-control" id="full_name"
+                                        name="full_name" required></div>
+                                <div class="col-md-6 mb-3"><label for="position_applied_for" class="form-label">Poste
+                                        Visé</label><input type="text" class="form-control" id="position_applied_for"
+                                        name="position_applied_for" required></div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3"><label for="email" class="form-label">Email</label><input
+                                        type="email" class="form-control" id="email" name="email" required></div>
+                                <div class="col-md-6 mb-3"><label for="phone" class="form-label">Téléphone</label><input
+                                        type="tel" class="form-control" id="phone" name="phone"></div>
+                            </div>
+                            <div class="mb-3"><label for="notes" class="form-label">Notes / CV</label><textarea
+                                    class="form-control" id="notes" name="notes" rows="5"
+                                    placeholder="Coller le CV ou ajouter des notes ici..."></textarea></div><button
+                                type="submit" class="btn btn-primary">Enregistrer Candidat</button><a
+                                href="{{ url_for('list_candidates') }}" class="btn btn-light">Annuler</a>
+                        </form>
+                    </div>
+                </div>
 
                 {% elif view == 'chantiers_list' %}
-                    <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">Liste des Chantiers</h1><a href="#" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Nouveau Chantier</a></div>
-                    <div class="card"><div class="card-body text-center text-muted">La liste des chantiers apparaîtra ici.</div></div>
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="page-title mb-0">Liste des Chantiers</h1><a href="#" class="btn btn-primary"><i
+                            class="bi bi-plus-circle-fill me-2"></i>Nouveau Chantier</a>
+                </div>
+                <div class="card">
+                    <div class="card-body text-center text-muted">La liste des chantiers apparaîtra ici.</div>
+                </div>
                 {% elif view == 'sav_list' %}
-                    <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">Tickets SAV</h1><a href="#" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Nouveau Ticket</a></div>
-                    <div class="card"><div class="card-body text-center text-muted">La liste des tickets SAV apparaîtra ici.</div></div>
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="page-title mb-0">Tickets SAV</h1><a href="#" class="btn btn-primary"><i
+                            class="bi bi-plus-circle-fill me-2"></i>Nouveau Ticket</a>
+                </div>
+                <div class="card">
+                    <div class="card-body text-center text-muted">La liste des tickets SAV apparaîtra ici.</div>
+                </div>
                 {% elif view == 'factures_list' %}
-                    <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">Liste des Factures</h1><a href="#" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Nouvelle Facture</a></div>
-                    <div class="card"><div class="card-body text-center text-muted">La liste des factures apparaîtra ici.</div></div>
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="page-title mb-0">Liste des Factures</h1><a href="#" class="btn btn-primary"><i
+                            class="bi bi-plus-circle-fill me-2"></i>Nouvelle Facture</a>
+                </div>
+                <div class="card">
+                    <div class="card-body text-center text-muted">La liste des factures apparaîtra ici.</div>
+                </div>
                 {% elif view == 'planning_list' %}
-                    <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">Planning</h1><a href="#" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Nouvel Événement</a></div>
-                    <div class="card"><div class="card-body text-center text-muted">Le calendrier du planning apparaîtra ici.</div></div>
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="page-title mb-0">Planning</h1><a href="#" class="btn btn-primary"><i
+                            class="bi bi-plus-circle-fill me-2"></i>Nouvel Événement</a>
+                </div>
+                <div class="card">
+                    <div class="card-body text-center text-muted">Le calendrier du planning apparaîtra ici.</div>
+                </div>
                 {% elif view == 'documents_list' %}
-                    <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">Gestion des Documents</h1><a href="#" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Télécharger</a></div>
-                    <div class="card"><div class="card-body text-center text-muted">La liste des documents apparaîtra ici.</div></div>
-                
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="page-title mb-0">Gestion des Documents</h1><a href="#" class="btn btn-primary"><i
+                            class="bi bi-plus-circle-fill me-2"></i>Télécharger</a>
+                </div>
+                <div class="card">
+                    <div class="card-body text-center text-muted">La liste des documents apparaîtra ici.</div>
+                </div>
+
+                {# --- NOUVELLE VUE POUR LA GESTION DES UTILISATEURS --- #}
+                {% elif view == 'users_list' %}
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="page-title mb-0">Gestion des Utilisateurs</h1>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        Ajouter un nouvel utilisateur
+                    </div>
+                    <div class="card-body">
+                        <form action="{{ url_for('add_user') }}" method="POST" class="row g-3">
+                            <div class="col-md-4">
+                                <label for="username" class="form-label">Nom d'utilisateur</label>
+                                <input type="text" class="form-control" name="username" id="username" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="password" class="form-label">Mot de passe</label>
+                                <input type="password" class="form-control" name="password" id="password" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="role" class="form-label">Rôle</label>
+                                <select name="role" id="role" class="form-select" required>
+                                    <option value="Employé">Employé</option>
+                                    <option value="Chef de projet">Chef de projet</option>
+                                    <option value="admin">admin</option>
+                                </select>
+                            </div>
+                            <div class="col-md-1 d-flex align-items-end">
+                                <button type="submit" class="btn btn-primary w-100">Ajouter</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Nom d'utilisateur</th>
+                                        <th>Rôle</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for user in users %}
+                                    <tr>
+                                        <td>{{ user.username }}</td>
+                                        <td><span class="badge bg-secondary">{{ user.role }}</span></td>
+                                        <td>
+                                            <a href="#" class="btn btn-sm btn-outline-secondary disabled">Modifier</a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
                 {% endif %}
+
 
             </div>
         </main>
     </div>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-    document.addEventListener("DOMContentLoaded", function () {
-        const toggleBtn = document.getElementById('toggle-sidebar');
-        const sidebar = document.querySelector('.sidebar');
+        document.addEventListener("DOMContentLoaded", function () {
+            const toggleBtn = document.getElementById('toggle-sidebar');
+            const sidebar = document.querySelector('.sidebar');
 
-        if (toggleBtn && sidebar) {
-            toggleBtn.addEventListener('click', () => {
-                sidebar.classList.toggle('show');
-            });
-        }
-    });
+            if (toggleBtn && sidebar) {
+                toggleBtn.addEventListener('click', () => {
+                    sidebar.classList.toggle('show');
+                });
+            }
+        });
     </script>
-{% endif %}
+    {% endif %}
 </body>
+
 </html>
