@@ -13,6 +13,8 @@
 body {
     background-color: var(--content-bg);
     font-family: 'Segoe UI', system-ui, sans-serif;
+    /* Empêche le défilement sur le corps de la page pour le laisser au contenu principal */
+    overflow: hidden;
 }
 
 /* --- Styles pour la page de connexion --- */
@@ -36,17 +38,18 @@ body {
 .sidebar {
     width: var(--sidebar-width);
     height: 100vh;
-    /* C'est cette ligne qui fixe le menu. */
     position: fixed; 
     top: 0;
     left: 0;
     background: var(--sidebar-bg);
     color: var(--sidebar-link-hover-color);
     padding: 1rem;
-    display: flex;
-    flex-direction: column;
     transition: transform 0.3s ease-in-out;
     z-index: 1000;
+    
+    /* Propriétés Flexbox pour organiser le contenu du menu (nettoyées) */
+    display: flex;
+    flex-direction: column;
 }
 
 .sidebar-header {
@@ -54,7 +57,38 @@ body {
     padding-bottom: 1rem;
     border-bottom: 1px solid var(--sidebar-link-hover-bg);
     margin-bottom: 1rem;
+    /* Empêche l'en-tête de rétrécir */
+    flex-shrink: 0;
 }
+
+.sidebar-footer {
+    margin-top: auto;
+    padding-top: 1rem;
+    border-top: 1px solid var(--sidebar-link-hover-bg);
+    /* Empêche le pied de page de rétrécir */
+    flex-shrink: 0;
+}
+
+/*
+ * --- CORRECTION POUR LE DÉFILEMENT DU MENU ---
+*/
+.sidebar .nav {
+    flex-grow: 1;        /* Permet à la zone de navigation de prendre tout l'espace vertical */
+    overflow: auto;      /* Affiche les barres de défilement (H ou V) si nécessaire */
+}
+
+.sidebar .nav-link {
+    color: var(--sidebar-link-color);
+    padding: 0.75rem 1rem;
+    border-radius: 0.25rem;
+    margin-bottom: 0.25rem;
+    
+    /* CORRECTION : Force le texte à rester sur une seule ligne pour permettre le défilement horizontal */
+    white-space: nowrap; 
+}
+/* --- FIN DE LA CORRECTION --- */
+
+
 .sidebar .logo {
     height: 40px;
     margin-bottom: 0.5rem;
@@ -62,12 +96,6 @@ body {
 .sidebar .brand-name {
     font-size: 1.25rem;
     font-weight: bold;
-}
-.sidebar .nav-link {
-    color: var(--sidebar-link-color);
-    padding: 0.75rem 1rem;
-    border-radius: 0.25rem;
-    margin-bottom: 0.25rem;
 }
 .sidebar .nav-link i {
     margin-right: 10px;
@@ -81,9 +109,6 @@ body {
     background-color: var(--sidebar-link-active-bg);
     color: var(--sidebar-link-hover-color);
 }
-.sidebar-footer {
-    margin-top: auto;
-}
 .sidebar .logout-btn {
     background-color: #dc3545;
     color: #fff;
@@ -91,11 +116,12 @@ body {
 }
 
 .main-content {
-    /* LA CORRECTION EST ICI : 
-       On pousse le contenu vers la droite pour qu'il ne soit plus caché sous le menu. */
     margin-left: var(--sidebar-width);
     width: calc(100% - var(--sidebar-width));
     padding: 2rem;
+    /* Ajout du défilement pour le contenu principal */
+    height: 100vh;
+    overflow-y: auto;
 }
 
 .page-title {
@@ -122,7 +148,17 @@ body {
     font-size: 1.5rem;
 }
 
-
+/* Style pour les titres de catégorie dans le menu */
+.nav-category-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #8a96a3;
+    padding: 0.5rem 1rem;
+    margin-top: 0.5rem;
+    letter-spacing: 0.05em;
+    white-space: nowrap; /* Assure que les titres ne vont pas à la ligne */
+}
 /* --- Styles pour la version Mobile (Responsive) --- */
 @media (max-width: 768px) {
     .menu-toggle {
@@ -146,15 +182,12 @@ body {
     }
 }
 /* --- Améliorations pour la vue mobile --- */
-/* --- Améliorations pour la vue mobile --- */
 @media (max-width: 576px) {
   /* Cible l'en-tête des pages pour les empiler verticalement */
   .page-header-mobile-stack {
     flex-direction: column; /* Met les éléments en colonne */
-    align-items: center !important; /* Aligne les blocs au centre (déjà présent) */
+    align-items: center !important; 
     gap: 1rem; /* Ajoute un espace entre le titre et le bouton */
-    
-    /* LA CORRECTION EST ICI : */
     text-align: center; /* Centre le texte à l'intérieur des éléments enfants */
   }
 }

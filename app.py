@@ -18,8 +18,6 @@ login_manager.login_message_category = "info"
 app.secret_key = os.environ.get('SECRET_KEY', 'a_secure_random_secret_key_for_development')
 
 # --- DATABASE CONFIGURATION ---
-# Replace with your actual database URI
-#app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql://tsb_jilz_user:WQuuirqxSdknwZjsvldYzD0DbhcOBzQ7@dpg-d0jjegmmcj7s73836lp0-a/tsb_jilz')
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///mydatabase.db"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -43,6 +41,7 @@ class Client(db.Model):
     status = db.Column(db.String(50), default='Prospect')
     last_contact_date = db.Column(db.DateTime, default=datetime.utcnow)
     quotes = db.relationship('Quote', backref='client', lazy=True, cascade="all, delete-orphan")
+    chantiers = db.relationship('Chantier', backref='client', lazy=True)
 
 class Equipment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -110,6 +109,48 @@ class Candidate(db.Model):
     application_date = db.Column(db.Date, default=datetime.utcnow)
     status = db.Column(db.String(50), default='Applied') # Applied, Shortlisted, Interview, Offer, Hired, Rejected
     notes = db.Column(db.Text, nullable=True)
+
+# NOUVEAUX MODÈLES
+class Chantier(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
+    status = db.Column(db.String(50), default='Planifié') # Planifié, En cours, Terminé, Annulé
+    start_date = db.Column(db.Date)
+    end_date = db.Column(db.Date)
+
+class Facture(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    invoice_number = db.Column(db.String(50), unique=True, nullable=False)
+    client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
+    quote_id = db.Column(db.Integer, db.ForeignKey('quote.id'), nullable=True)
+    amount = db.Column(db.Float, nullable=False)
+    status = db.Column(db.String(50), default='Brouillon') # Brouillon, Envoyée, Payée, En retard
+    due_date = db.Column(db.Date)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Document(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(255), nullable=False)
+    filepath = db.Column(db.String(500), nullable=False)
+    upload_date = db.Column(db.DateTime, default=datetime.utcnow)
+    chantier_id = db.Column(db.Integer, db.ForeignKey('chantier.id'), nullable=True)
+
+class SavTicket(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    ticket_number = db.Column(db.String(50), unique=True, nullable=False)
+    client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
+    equipment_id = db.Column(db.Integer, db.ForeignKey('equipment.id'), nullable=True)
+    description = db.Column(db.Text, nullable=False)
+    status = db.Column(db.String(50), default='Ouvert') # Ouvert, En cours, Fermé
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class PlanningEvent(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    start_time = db.Column(db.DateTime, nullable=False)
+    end_time = db.Column(db.DateTime, nullable=False)
+    description = db.Column(db.Text)
 
 
 # --- UTILITY FUNCTIONS ---
@@ -254,14 +295,46 @@ def generate_quote_pdf(quote_id):
         flash("Error: WeasyPrint is not installed. Run 'pip install WeasyPrint'", "danger")
         return redirect(url_for('list_quotes'))
     quote = Quote.query.get_or_404(quote_id)
-    # This requires a 'quote_pdf_template.html' file not provided in the scope of this request.
-    # A placeholder message is used for rendering the PDF.
     rendered_html = f"<h1>Quote {quote.quote_number}</h1><p>Client: {quote.client.name}</p><p>Total: {quote.total_price:.2f} €</p>"
     pdf = HTML(string=rendered_html).write_pdf()
     response = make_response(pdf)
     response.headers['Content-Type'] = 'application/pdf'
     response.headers['Content-Disposition'] = f'inline; filename=Quote_{quote.quote_number}.pdf'
     return response
+
+# --- NOUVELLES ROUTES ---
+@app.route('/chantiers')
+@login_required
+def list_chantiers():
+    chantiers = Chantier.query.all()
+    return render_template('main_template.html', view='chantiers_list', chantiers=chantiers)
+
+@app.route('/sav')
+@login_required
+def list_sav():
+    tickets = SavTicket.query.all()
+    return render_template('main_template.html', view='sav_list', tickets=tickets)
+
+@app.route('/factures')
+@login_required
+def list_factures():
+    factures = Facture.query.all()
+    return render_template('main_template.html', view='factures_list', factures=factures)
+
+@app.route('/planning')
+@login_required
+def list_planning():
+    events = PlanningEvent.query.all()
+    return render_template('main_template.html', view='planning_list', events=events)
+
+@app.route('/documents')
+@login_required
+def list_documents():
+    documents = Document.query.all()
+    return render_template('main_template.html', view='documents_list', documents=documents)
+
+# --- FIN DES NOUVELLES ROUTES ---
+
 
 ## Employee & HR Routes
 @app.route('/employees')
@@ -276,20 +349,15 @@ def add_employee():
     if request.method == 'POST':
         hire_date = datetime.strptime(request.form['hire_date'], '%Y-%m-%d').date() if request.form['hire_date'] else datetime.utcnow().date()
         salary = float(request.form['salary']) if request.form['salary'] else None
-        
         new_employee = Employee(
-            full_name=request.form['full_name'],
-            position=request.form['position'],
-            email=request.form['email'],
-            phone=request.form['phone'],
-            hire_date=hire_date,
-            salary=salary
+            full_name=request.form['full_name'], position=request.form['position'],
+            email=request.form['email'], phone=request.form['phone'],
+            hire_date=hire_date, salary=salary
         )
         db.session.add(new_employee)
         db.session.commit()
         flash('Employee added successfully!', 'success')
         return redirect(url_for('list_employees'))
-        
     return render_template('main_template.html', view='employee_form', form_title="Ajouter un Employé", employee=None)
 
 @app.route('/employee/edit/<int:employee_id>', methods=['GET', 'POST'])
@@ -303,11 +371,9 @@ def edit_employee(employee_id):
         employee.phone = request.form['phone']
         employee.hire_date = datetime.strptime(request.form['hire_date'], '%Y-%m-%d').date() if request.form['hire_date'] else employee.hire_date
         employee.salary = float(request.form['salary']) if request.form['salary'] else employee.salary
-        
         db.session.commit()
         flash('Employee details updated successfully!', 'success')
         return redirect(url_for('list_employees'))
-        
     return render_template('main_template.html', view='employee_form', form_title="Modifier l'Employé", employee=employee)
 
 ## Leave Management Routes
@@ -329,11 +395,8 @@ def request_leave():
             return redirect(url_for('request_leave'))
 
         new_request = LeaveRequest(
-            employee_id=request.form['employee_id'],
-            leave_type=request.form['leave_type'],
-            start_date=start_date,
-            end_date=end_date,
-            reason=request.form['reason']
+            employee_id=request.form['employee_id'], leave_type=request.form['leave_type'],
+            start_date=start_date, end_date=end_date, reason=request.form['reason']
         )
         db.session.add(new_request)
         db.session.commit()
@@ -370,11 +433,8 @@ def list_candidates():
 def add_candidate():
     if request.method == 'POST':
         new_candidate = Candidate(
-            full_name=request.form['full_name'],
-            email=request.form['email'],
-            phone=request.form['phone'],
-            position_applied_for=request.form['position_applied_for'],
-            notes=request.form['notes']
+            full_name=request.form['full_name'], email=request.form['email'], phone=request.form['phone'],
+            position_applied_for=request.form['position_applied_for'], notes=request.form['notes']
         )
         db.session.add(new_candidate)
         db.session.commit()
@@ -404,7 +464,7 @@ def convert_to_employee(candidate_id):
     
     employee_data = {
         'full_name': candidate.full_name, 'email': candidate.email, 'phone': candidate.phone, 'position': candidate.position_applied_for,
-        'salary': None, 'hire_date': None # Set to None to not pre-fill them
+        'salary': None, 'hire_date': None
     }
     flash('Please complete the remaining details for the new employee.', 'info')
     return render_template('main_template.html', view='employee_form', form_title="Convertir Candidat en Employé", employee=employee_data)
@@ -419,5 +479,6 @@ with app.app_context():
         db.session.commit()
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 10000))
+    port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
+    
