@@ -73,18 +73,31 @@
 
             <nav class="nav">
                 <div class="nav-scroll-content">
-                    <a class="nav-link {% if view == 'dashboard' %}active{% endif %}"
-                        href="{{ url_for('dashboard') }}"><i class="bi bi-house-door-fill"></i> Dashboard</a>
+
+                    {% if current_user.role == 'CEO' %}
+                    <a class="nav-link {% if view == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
+                        <i class="bi bi-house-door-fill"></i> Dashboard
+                    </a>
+                    {% endif %}
+
+                    {% if current_user.role in ['CEO', 'RH'] %}
                     <div class="mt-2">
                         <h3 class="nav-category-title">RH</h3>
+                        <a class="nav-link {% if 'client' in view %}active{% endif %}"
+                            href="{{ url_for('list_clients') }}"><i class="bi bi-person-check-fill"></i> Clients</a>
                         <a class="nav-link {% if 'employee' in view %}active{% endif %}"
                             href="{{ url_for('list_employees') }}"><i class="bi bi-people-fill"></i> Employés</a>
                         <a class="nav-link {% if 'leave' in view %}active{% endif %}"
                             href="{{ url_for('list_leaves') }}"><i class="bi bi-calendar-check-fill"></i> Congés</a>
+                        <a class="nav-link {% if 'hebergement' in view %}active{% endif %}"
+                            href="{{ url_for('list_hebergements') }}"><i class="bi bi-building"></i> Hébergement</a>
                         <a class="nav-link {% if 'candidate' in view %}active{% endif %}"
                             href="{{ url_for('list_candidates') }}"><i class="bi bi-person-plus-fill"></i>
                             Recrutement</a>
                     </div>
+                    {% endif %}
+
+                    {% if current_user.role in ['CEO', 'Chef de projet'] %}
                     <div class="mt-2">
                         <h3 class="nav-category-title">Opérations</h3>
                         <a class="nav-link {% if 'chantier' in view %}active{% endif %}"
@@ -94,6 +107,9 @@
                         <a class="nav-link {% if 'sav' in view %}active{% endif %}" href="{{ url_for('list_sav') }}"><i
                                 class="bi bi-headphones"></i> SAV</a>
                     </div>
+                    {% endif %}
+
+                    {% if current_user.role in ['CEO', 'Finance'] %}
                     <div class="mt-2">
                         <h3 class="nav-category-title">Finances</h3>
                         <a class="nav-link {% if 'quote' in view %}active{% endif %}"
@@ -101,20 +117,22 @@
                         <a class="nav-link {% if 'facture' in view %}active{% endif %}"
                             href="{{ url_for('list_factures') }}"><i class="bi bi-credit-card"></i> Factures</a>
                     </div>
+                    {% endif %}
+
                     <div class="mt-2">
                         <h3 class="nav-category-title">Autres</h3>
-                        <a class="nav-link {% if 'client' in view %}active{% endif %}"
-                            href="{{ url_for('list_clients') }}"><i class="bi bi-person-check-fill"></i> Clients</a>
                         <a class="nav-link {% if 'planning' in view %}active{% endif %}"
                             href="{{ url_for('list_planning') }}"><i class="bi bi-map-fill"></i> Planning</a>
                         <a class="nav-link {% if 'document' in view %}active{% endif %}"
                             href="{{ url_for('list_documents') }}"><i class="bi bi-folder-fill"></i> Documents</a>
-                        {% if current_user.role == 'admin' %}
+
+                        {% if current_user.role == 'CEO' %}
                         <a class="nav-link {% if 'users' in view %}active{% endif %}"
                             href="{{ url_for('manage_users') }}"><i class="bi bi-person-gear"></i> Gestion
                             Utilisateurs</a>
                         {% endif %}
                     </div>
+
                 </div>
             </nav>
 
@@ -180,11 +198,104 @@
                         </div>
                     </div>
                 </div>
+                {% elif view == 'hebergements_list' %}
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="page-title mb-0">Hébergements des Employés</h1>
+                    <a href="{{ url_for('add_hebergement') }}" class="btn btn-primary"><i
+                            class="bi bi-plus-circle-fill me-2"></i>Ajouter un Hébergement</a>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Employé(s)</th>
+                                        <th>Adresse</th>
+                                        <th>Début</th>
+                                        <th>Fin</th>
+                                        <th>Coût/Mois</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for hebergement in hebergements %}
+                                    <tr>
+                                        <td>
+                                            {% for employee in hebergement.employees %}
+                                            <span class="badge bg-secondary me-1">{{ employee.full_name }}</span>
+                                            {% else %}
+                                            <span class="text-muted">Aucun employé assigné</span>
+                                            {% endfor %}
+                                        </td>
+                                        <td>{{ hebergement.address }}</td>
+                                        <td>{{ hebergement.start_date.strftime('%d/%m/%Y') }}</td>
+                                        <td>{{ hebergement.end_date.strftime('%d/%m/%Y') if hebergement.end_date else
+                                            '-' }}</td>
+                                        <td>{{ "%.2f"|format(hebergement.cost) ~ " €" if hebergement.cost else '-' }}
+                                        </td>
+                                        <td><a href="#" class="btn btn-sm btn-outline-secondary disabled">Modifier</a>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted">Aucun hébergement enregistré.
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
 
-                {% elif view == 'clients_list' %}
-                <div class="d-flex justify-content-between align-items-center mb-4 page-header-mobile-stack">
-                    <h1 class="page-title mb-0">Liste des Clients</h1><a href="{{ url_for('add_client') }}"
-                        class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Ajouter un Client</a>
+                {# --- NOUVELLE VUE POUR LE FORMULAIRE D'HÉBERGEMENT --- #}
+                {% elif view == 'hebergement_form' %}
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="page-title mb-0">{{ form_title }}</h1>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <form method="POST">
+                            <div class="mb-3">
+                                <label for="employee_ids" class="form-label">Employé(s) concerné(s)</label>
+                                <small class="form-text text-muted d-block mb-2">Maintenez la touche Ctrl (ou Cmd sur
+                                    Mac) pour en sélectionner plusieurs.</small>
+                                <select name="employee_ids" id="employee_ids" class="form-select" multiple required>
+                                    {% for employee in employees %}
+                                    <option value="{{ employee.id }}">{{ employee.full_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="address" class="form-label">Adresse de l'hébergement</label>
+                                <textarea name="address" id="address" class="form-control" rows="3" required></textarea>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4 mb-3"><label for="start_date" class="form-label">Date de
+                                        début</label><input type="date" class="form-control" name="start_date"
+                                        id="start_date" required></div>
+                                <div class="col-md-4 mb-3"><label for="end_date" class="form-label">Date de fin
+                                        (Optionnel)</label><input type="date" class="form-control" name="end_date"
+                                        id="end_date"></div>
+                                <div class="col-md-4 mb-3"><label for="cost" class="form-label">Coût Mensuel
+                                        (Optionnel)</label>
+                                    <div class="input-group"><input type="number" step="0.01" class="form-control"
+                                            name="cost" id="cost"><span class="input-group-text">€</span></div>
+                                </div>
+                            </div>
+                            <div class="mb-3"><label for="notes" class="form-label">Notes (Optionnel)</label><textarea
+                                    name="notes" id="notes" class="form-control" rows="2"></textarea></div>
+                            <button type="submit" class="btn btn-primary">Enregistrer</button>
+                            <a href="{{ url_for('list_hebergements') }}" class="btn btn-light">Annuler</a>
+                        </form>
+                    </div>
+                </div>
+                {% elif view == 'chantiers_list' %}
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="page-title mb-0">Liste des Chantiers</h1>
+                    <a href="{{ url_for('add_chantier') }}" class="btn btn-primary"><i
+                            class="bi bi-plus-circle-fill me-2"></i>Nouveau Chantier</a>
                 </div>
                 <div class="card">
                     <div class="card-body">
@@ -193,22 +304,29 @@
                                 <thead>
                                     <tr>
                                         <th>Nom</th>
-                                        <th>Email</th>
-                                        <th>Téléphone</th>
-                                        <th>Status</th>
+                                        <th>Client</th>
+                                        <th>Statut</th>
+                                        <th>Date de début</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody>{% for client in clients %}<tr>
-                                        <td><strong>{{ client.name }}</strong></td>
-                                        <td>{{ client.email or '-' }}</td>
-                                        <td>{{ client.phone or '-' }}</td>
-                                        <td><span class="badge bg-info text-dark">{{ client.status }}</span></td>
-                                        <td><a href="{{ url_for('client_profile', client_id=client.id) }}"
-                                                class="btn btn-sm btn-outline-primary">Voir Profil</a></td>
-                                    </tr>{% else %}<tr>
-                                        <td colspan="5" class="text-center text-muted">Aucun client trouvé.</td>
-                                    </tr>{% endfor %}</tbody>
+                                <tbody>
+                                    {% for chantier in chantiers %}
+                                    <tr>
+                                        <td><strong>{{ chantier.name }}</strong></td>
+                                        <td>{{ chantier.client.name }}</td>
+                                        <td><span class="badge bg-primary">{{ chantier.status }}</span></td>
+                                        <td>{{ chantier.start_date.strftime('%d/%m/%Y') if chantier.start_date else '-'
+                                            }}</td>
+                                        <td><a href="{{ url_for('chantier_profile', chantier_id=chantier.id) }}"
+                                                class="btn btn-sm btn-outline-primary">Voir les Détails</a></td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted">Aucun chantier trouvé.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
                             </table>
                         </div>
                     </div>
@@ -732,15 +850,58 @@
                 </div>
                 {% elif view == 'sav_list' %}
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h1 class="page-title mb-0">Tickets SAV</h1><a href="#" class="btn btn-primary"><i
+                    <h1 class="page-title mb-0">Tickets SAV</h1>
+                    <a href="{{ url_for('add_sav_ticket') }}" class="btn btn-primary"><i
                             class="bi bi-plus-circle-fill me-2"></i>Nouveau Ticket</a>
                 </div>
                 <div class="card">
                     <div class="card-body text-center text-muted">La liste des tickets SAV apparaîtra ici.</div>
                 </div>
+
+                {% elif view == 'clients_list' %}
+                <div class="d-flex justify-content-between align-items-center mb-4 page-header-mobile-stack">
+                    <h1 class="page-title mb-0">Liste des Clients</h1>
+                    <a href="{{ url_for('add_client') }}" class="btn btn-primary"><i
+                            class="bi bi-plus-circle-fill me-2"></i>Ajouter un Client</a>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Nom</th>
+                                        <th>Email</th>
+                                        <th>Téléphone</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for client in clients %}
+                                    <tr>
+                                        <td><strong>{{ client.name }}</strong></td>
+                                        <td>{{ client.email or '-' }}</td>
+                                        <td>{{ client.phone or '-' }}</td>
+                                        <td><span class="badge bg-info text-dark">{{ client.status }}</span></td>
+                                        <td><a href="{{ url_for('client_profile', client_id=client.id) }}"
+                                                class="btn btn-sm btn-outline-primary">Voir Profil</a></td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted">Aucun client trouvé.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
                 {% elif view == 'factures_list' %}
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h1 class="page-title mb-0">Liste des Factures</h1><a href="#" class="btn btn-primary"><i
+                    <h1 class="page-title mb-0">Liste des Factures</h1>
+                    <a href="{{ url_for('add_facture') }}" class="btn btn-primary"><i
                             class="bi bi-plus-circle-fill me-2"></i>Nouvelle Facture</a>
                 </div>
                 <div class="card">
@@ -748,57 +909,144 @@
                 </div>
                 {% elif view == 'planning_list' %}
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h1 class="page-title mb-0">Planning</h1><a href="#" class="btn btn-primary"><i
-                            class="bi bi-plus-circle-fill me-2"></i>Nouvel Événement</a>
+                    <h1 class="page-title mb-0">Planning</h1><a href="{{ url_for('add_planning_event') }}"
+                        class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Nouvel Événement</a>
                 </div>
                 <div class="card">
                     <div class="card-body text-center text-muted">Le calendrier du planning apparaîtra ici.</div>
                 </div>
                 {% elif view == 'documents_list' %}
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h1 class="page-title mb-0">Gestion des Documents</h1><a href="#" class="btn btn-primary"><i
-                            class="bi bi-plus-circle-fill me-2"></i>Télécharger</a>
+                    <h1 class="page-title mb-0">Gestion des Documents</h1>
+
+                    <a href="{{ url_for('add_document') }}" class="btn btn-primary"><i
+                            class="bi bi-plus-circle-fill me-2"></i>Ajouter un document</a>
                 </div>
+
                 <div class="card">
-                    <div class="card-body text-center text-muted">La liste des documents apparaîtra ici.</div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Nom du fichier</th>
+                                        <th>Propriétaire</th>
+                                        <th>Date d'ajout</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for doc in documents %}
+                                    <tr>
+                                        <td><i class="bi bi-file-earmark me-2"></i><strong>{{ doc.filename }}</strong>
+                                        </td>
+                                        <td>{{ doc.owner.username }}</td>
+                                        <td>{{ doc.upload_date.strftime('%d/%m/%Y') }}</td>
+                                        <td>
+                                            <a href="#" class="btn btn-sm btn-outline-primary disabled">Télécharger</a>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted">Aucun document trouvé.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
 
                 {# --- NOUVELLE VUE POUR LA GESTION DES UTILISATEURS --- #}
+                {% elif view == 'sav_form' %}
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="page-title mb-0">{{ form_title }}</h1>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <form method="POST">
+                            <div class="mb-3">
+                                <label for="client_id" class="form-label">Client</label>
+                                <select name="client_id" id="client_id" class="form-select" required>
+                                    <option value="">Sélectionner un client...</option>
+                                    {% for client in clients %}<option value="{{ client.id }}">{{ client.name }}
+                                    </option>{% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="description" class="form-label">Description du problème</label>
+                                <textarea name="description" id="description" class="form-control" rows="4"
+                                    required></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Créer le Ticket</button>
+                            <a href="{{ url_for('list_sav') }}" class="btn btn-light">Annuler</a>
+                        </form>
+                    </div>
+                </div>
+
+                {% elif view == 'facture_form' %}
+<div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">{{ form_title }}</h1></div>
+<div class="card">
+    <div class="card-body">
+        <form method="POST" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label for="client_id" class="form-label">Client</label>
+                <select name="client_id" id="client_id" class="form-select" required>
+                    <option value="">Sélectionner un client...</option>
+                    {% for client in clients %}<option value="{{ client.id }}">{{ client.name }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="amount" class="form-label">Montant Total TTC</label>
+                    <div class="input-group">
+                        <input type="number" step="0.01" class="form-control" name="amount" id="amount" required>
+                        <span class="input-group-text">€</span>
+                    </div>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label for="due_date" class="form-label">Date d'échéance</label>
+                    <input type="date" class="form-control" name="due_date" id="due_date">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label for="pdf_file" class="form-label">Fichier PDF (Optionnel)</label>
+                <input class="form-control" type="file" id="pdf_file" name="pdf_file" accept=".pdf">
+            </div>
+            <button type="submit" class="btn btn-primary">Créer la Facture</button>
+            <a href="{{ url_for('list_factures') }}" class="btn btn-light">Annuler</a>
+        </form>
+    </div>
+</div>
                 {% elif view == 'users_list' %}
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h1 class="page-title mb-0">Gestion des Utilisateurs</h1>
                 </div>
 
                 <div class="card mb-4">
-                    <div class="card-header">
-                        Ajouter un nouvel utilisateur
-                    </div>
+                    <div class="card-header">Ajouter un nouvel utilisateur</div>
                     <div class="card-body">
                         <form action="{{ url_for('add_user') }}" method="POST" class="row g-3">
-                            <div class="col-md-4">
-                                <label for="username" class="form-label">Nom d'utilisateur</label>
-                                <input type="text" class="form-control" name="username" id="username" required>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="password" class="form-label">Mot de passe</label>
-                                <input type="password" class="form-control" name="password" id="password" required>
-                            </div>
-                            <div class="col-md-3">
-                                <label for="role" class="form-label">Rôle</label>
-                                <select name="role" id="role" class="form-select" required>
-                                    <option value="Employé">Employé</option>
+                            <div class="col-md-4"><label for="username" class="form-label">Nom
+                                    d'utilisateur</label><input type="text" class="form-control" name="username"
+                                    id="username" required></div>
+                            <div class="col-md-4"><label for="password" class="form-label">Mot de passe</label><input
+                                    type="password" class="form-control" name="password" id="password" required></div>
+                            <div class="col-md-3"><label for="role" class="form-label">Rôle</label><select name="role"
+                                    id="role" class="form-select" required>
                                     <option value="Chef de projet">Chef de projet</option>
-                                    <option value="admin">admin</option>
-                                </select>
-                            </div>
-                            <div class="col-md-1 d-flex align-items-end">
-                                <button type="submit" class="btn btn-primary w-100">Ajouter</button>
-                            </div>
+                                    <option value="RH">RH</option>
+                                    <option value="Finance">Finance</option>
+                                    <option value="CEO">CEO</option>
+                                </select></div>
+                            <div class="col-md-1 d-flex align-items-end"><button type="submit"
+                                    class="btn btn-primary w-100">Ajouter</button></div>
                         </form>
                     </div>
                 </div>
 
                 <div class="card">
+                    <div class="card-header">Utilisateurs existants</div>
                     <div class="card-body">
                         <div class="table-responsive">
                             <table class="table table-hover">
@@ -815,12 +1063,260 @@
                                         <td>{{ user.username }}</td>
                                         <td><span class="badge bg-secondary">{{ user.role }}</span></td>
                                         <td>
-                                            <a href="#" class="btn btn-sm btn-outline-secondary disabled">Modifier</a>
+                                            {% if user.role != 'CEO' %}
+                                            <a href="{{ url_for('edit_user', user_id=user.id) }}"
+                                                class="btn btn-sm btn-outline-secondary">Modifier</a>
+                                            <form action="{{ url_for('delete_user', user_id=user.id) }}" method="POST"
+                                                class="d-inline"
+                                                onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?');">
+                                                <button type="submit"
+                                                    class="btn btn-sm btn-outline-danger">Supprimer</button>
+                                            </form>
+                                            {% else %}
+                                            <span class="text-muted">Non modifiable</span>
+                                            {% endif %}
                                         </td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                </div>
+                {# --- NOUVELLE VUE POUR MODIFIER UN UTILISATEUR --- #}
+                {% elif view == 'planning_form' %}
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="page-title mb-0">{{ form_title }}</h1>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <form method="POST">
+                            <div class="mb-3">
+                                <label for="title" class="form-label">Titre de l'événement</label>
+                                <input type="text" class="form-control" name="title" id="title" required>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="start_time" class="form-label">Date et Heure de Début</label>
+                                    <input type="datetime-local" class="form-control" name="start_time" id="start_time"
+                                        required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="end_time" class="form-label">Date et Heure de Fin</label>
+                                    <input type="datetime-local" class="form-control" name="end_time" id="end_time"
+                                        required>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="description" class="form-label">Description (Optionnel)</label>
+                                <textarea name="description" id="description" class="form-control" rows="3"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Enregistrer</button>
+                            <a href="{{ url_for('list_planning') }}" class="btn btn-light">Annuler</a>
+                        </form>
+                    </div>
+                </div>
+                {% elif view == 'user_edit_form' %}
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="page-title mb-0">Modifier l'utilisateur : {{ user.username }}</h1>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <form method="POST">
+                            <div class="mb-3">
+                                <label class="form-label">Nom d'utilisateur</label>
+                                <input type="text" class="form-control" value="{{ user.username }}" readonly disabled>
+                            </div>
+                            <div class="mb-3">
+                                <label for="role" class="form-label">Rôle</label>
+                                <select name="role" id="role" class="form-select" required>
+                                    <option value="Chef de projet" {% if user.role=='Chef de projet' %}selected{% endif
+                                        %}>Chef de projet</option>
+                                    <option value="RH" {% if user.role=='RH' %}selected{% endif %}>RH</option>
+                                    <option value="Finance" {% if user.role=='Finance' %}selected{% endif %}>Finance
+                                    </option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
+                            <a href="{{ url_for('manage_users') }}" class="btn btn-light">Annuler</a>
+                        </form>
+                    </div>
+                </div>
+                {% elif view == 'document_form' %}
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="page-title mb-0">Ajouter un document</h1>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <form method="POST">
+                            <div class="mb-3">
+                                <label for="filename" class="form-label">Nom du fichier</label>
+                                <input type="text" class="form-control" name="filename" id="filename"
+                                    placeholder="Ex: plan_etage_1.pdf" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Enregistrer</button>
+                            <a href="{{ url_for('list_documents') }}" class="btn btn-light">Annuler</a>
+                        </form>
+                    </div>
+                </div>
+
+                {% elif view == 'bienvenue_page' %}
+                <div class="page-header-mobile-stack">
+                    <h1 class="page-title">Bienvenue, {{ current_user.username }} !</h1>
+                    <p class="text-muted mb-4">Voici un accès rapide aux sections qui vous sont autorisées.</p>
+                </div>
+
+                <div class="row">
+                    {% if current_user.role == 'RH' %}
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body text-center d-flex flex-column">
+                                <i class="bi bi-people-fill fs-1 text-primary"></i>
+                                <h5 class="card-title mt-3">Ressources Humaines</h5>
+                                <p class="card-text">Gérer les employés, congés et recrutements.</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if current_user.role == 'Chef de projet' %}
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body text-center d-flex flex-column">
+                                <i class="bi bi-wrench fs-1 text-success"></i>
+                                <h5 class="card-title mt-3">Opérations</h5>
+                                <p class="card-text">Gérer les chantiers et les équipements.</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if current_user.role == 'Finance' %}
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body text-center d-flex flex-column">
+                                <i class="bi bi-credit-card fs-1 text-info"></i>
+                                <h5 class="card-title mt-3">Finances</h5>
+                                <p class="card-text">Gérer les devis et les factures.</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {# --- Carte visible par tous les non-CEOs --- #}
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body text-center d-flex flex-column">
+                                <i class="bi bi-person-check-fill fs-1 text-secondary"></i>
+                                <h5 class="card-title mt-3">Sections Communes</h5>
+                                <p class="card-text">Gérer les clients, le planning et les documents.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+                {% elif view == 'chantier_form' %}
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="page-title mb-0">{{ form_title }}</h1>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <form method="POST">
+                            <div class="mb-3">
+                                <label for="name" class="form-label">Nom du Chantier</label>
+                                <input type="text" class="form-control" name="name" id="name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="client_id" class="form-label">Client Associé</label>
+                                <select name="client_id" id="client_id" class="form-select" required>
+                                    <option value="">Sélectionner un client...</option>
+                                    {% for client in clients %}
+                                    <option value="{{ client.id }}">{{ client.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="status" class="form-label">Statut</label>
+                                    <select name="status" id="status" class="form-select">
+                                        <option>Planifié</option>
+                                        <option>En cours</option>
+                                        <option>Terminé</option>
+                                        <option>Annulé</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="start_date" class="form-label">Date de Début</label>
+                                    <input type="date" class="form-control" name="start_date" id="start_date">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="end_date" class="form-label">Date de Fin</label>
+                                    <input type="date" class="form-control" name="end_date" id="end_date">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Enregistrer</button>
+                            <a href="{{ url_for('list_chantiers') }}" class="btn btn-light">Annuler</a>
+                        </form>
+                    </div>
+                </div>
+
+                {% elif view == 'chantier_profile' %}
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="page-title mb-0"><i class="bi bi-wrench me-2"></i>{{ chantier.name }}</h1>
+                    <a href="#" class="btn btn-secondary disabled"><i class="bi bi-pencil-fill me-2"></i>Modifier</a>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Informations</h5>
+                                <p><strong>Client:</strong> {{ chantier.client.name }}</p>
+                                <p><strong>Statut:</strong> <span class="badge bg-primary">{{ chantier.status }}</span>
+                                </p>
+                                <p><strong>Début:</strong> {{ chantier.start_date.strftime('%d/%m/%Y') if
+                                    chantier.start_date else 'N/A' }}</p>
+                                <p><strong>Fin:</strong> {{ chantier.end_date.strftime('%d/%m/%Y') if chantier.end_date
+                                    else 'N/A' }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-8">
+                        <div class="card mb-4">
+                            <div class="card-header">Documents / Liens Associés</div>
+                            <ul class="list-group list-group-flush">
+                                {% for doc in chantier.documents %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <i class="bi bi-link-45deg me-2"></i>
+                                        <a href="{{ doc.url }}" target="_blank">{{ doc.name }}</a>
+                                    </div>
+                                    <small class="text-muted">Ajouté par {{ doc.owner.username }}</small>
+                                </li>
+                                {% else %}
+                                <li class="list-group-item text-muted">Aucun document lié à ce chantier.</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        <div class="card">
+                            <div class="card-body">
+                                <form action="{{ url_for('add_document_to_chantier', chantier_id=chantier.id) }}"
+                                    method="POST">
+                                    <h6 class="card-title">Lier un nouveau document/lien</h6>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-2">
+                                            <input type="text" class="form-control" name="doc_name"
+                                                placeholder="Nom du lien (ex: Plans PDF)" required>
+                                        </div>
+                                        <div class="col-md-6 mb-2">
+                                            <input type="url" class="form-control" name="doc_url"
+                                                placeholder="URL du lien (https://...)" required>
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-primary w-100" type="submit">Lier</button>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 </div>
