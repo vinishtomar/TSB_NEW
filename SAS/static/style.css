@@ -1,96 +1,193 @@
+/* Définition des variables de couleur pour une maintenance facile */
 :root {
-    --primary-color: #005A9C;
-    --sidebar-bg: #1e293b;
-    --sidebar-text: #cbd5e1;
-    --sidebar-text-hover: #ffffff;
-    --sidebar-active-bg: #334155;
-    --content-bg: #f1f5f9;
+    --primary-color: #0d6efd;
+    --sidebar-bg: #343a40; /* Couleur gris foncé du menu */
+    --sidebar-link-color: #adb5bd;
+    --sidebar-link-hover-bg: #495057;
+    --sidebar-link-hover-color: #fff;
+    --sidebar-link-active-bg: #0d6efd; /* Bleu pour le lien actif */
+    --content-bg: #f8f9fa; /* Fond de la zone de contenu principale */
+    --sidebar-width: 260px;
 }
 
 body {
-    margin: 0;
-    font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     background-color: var(--content-bg);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    /* Empêche le défilement sur le corps de la page pour le laisser au contenu principal */
+    overflow: hidden;
 }
-/* Login Page Specific Styles */
+
+/* --- Styles pour la page de connexion --- */
 .login-wrapper {
+    min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 100vh;
-    background-color: var(--content-bg);
+    background-color: #eef2f7;
 }
 .login-card {
+    max-width: 450px;
     width: 100%;
-    max-width: 420px;
 }
-/* Main Application Styles */
+
+/* --- Styles pour l'application principale --- */
 .page-wrapper {
     display: flex;
-    min-height: 100vh;
 }
+
 .sidebar {
-    width: 260px;
-    background-color: var(--sidebar-bg);
-    color: var(--sidebar-text);
-    display: flex;
-    flex-direction: column;
-    position: fixed;
+    width: var(--sidebar-width);
+    height: 100vh;
+    position: fixed; 
     top: 0;
     left: 0;
-    height: 100%;
-    transition: width 0.2s;
-}
-.sidebar-header {
-    padding: 1.5rem 1rem;
-    text-align: center;
-    border-bottom: 1px solid var(--sidebar-active-bg);
-}
-.sidebar-header .logo { height: 40px; margin-bottom: 0.5rem; }
-.sidebar-header .brand-name { font-size: 1.2rem; font-weight: 600; color: white; }
-
-.sidebar .nav-link {
-    color: var(--sidebar-text);
-    padding: 0.8rem 1.5rem;
-    font-size: 1rem;
+    background: var(--sidebar-bg);
+    color: var(--sidebar-link-hover-color);
+    padding: 1rem;
+    transition: transform 0.3s ease-in-out;
+    z-index: 1000;
+    
+    /* Propriétés Flexbox pour organiser le contenu du menu (nettoyées) */
     display: flex;
-    align-items: center;
-    border-left: 3px solid transparent;
+    flex-direction: column;
 }
-.sidebar .nav-link i { margin-right: 1rem; font-size: 1.2rem; }
-.sidebar .nav-link:hover { background-color: var(--sidebar-active-bg); color: var(--sidebar-text-hover); }
-.sidebar .nav-link.active { background-color: var(--sidebar-active-bg); color: white; font-weight: 600; border-left-color: var(--primary-color); }
+
+.sidebar-header {
+    text-align: center;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--sidebar-link-hover-bg);
+    margin-bottom: 1rem;
+    /* Empêche l'en-tête de rétrécir */
+    flex-shrink: 0;
+}
 
 .sidebar-footer {
     margin-top: auto;
-    padding: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--sidebar-link-hover-bg);
+    /* Empêche le pied de page de rétrécir */
+    flex-shrink: 0;
 }
-.sidebar-footer .logout-btn {
-    width: 100%;
-    background-color: var(--sidebar-active-bg);
-    color: white;
-    border: none;
-    text-align: center;
+
+/*
+ * --- CORRECTION POUR LE DÉFILEMENT DU MENU ---
+*/
+.sidebar .nav {
+    flex-grow: 1;        /* Permet à la zone de navigation de prendre tout l'espace vertical */
+    overflow: auto;      /* Affiche les barres de défilement (H ou V) si nécessaire */
 }
-.main-content {
-    margin-left: 260px;
-    flex-grow: 1;
-    padding: 2rem;
+
+.sidebar .nav-link {
+    color: var(--sidebar-link-color);
+    padding: 0.75rem 1rem;
+    border-radius: 0.25rem;
+    margin-bottom: 0.25rem;
+    
+    /* CORRECTION : Force le texte à rester sur une seule ligne pour permettre le défilement horizontal */
+    white-space: nowrap; 
 }
-.page-title {
-    font-weight: 700;
-    color: #334155;
+/* --- FIN DE LA CORRECTION --- */
+
+
+.sidebar .logo {
+    height: 40px;
     margin-bottom: 0.5rem;
+}
+.sidebar .brand-name {
+    font-size: 1.25rem;
+    font-weight: bold;
+}
+.sidebar .nav-link i {
+    margin-right: 10px;
+    font-size: 1.1rem;
+}
+.sidebar .nav-link:hover {
+    background-color: var(--sidebar-link-hover-bg);
+    color: var(--sidebar-link-hover-color);
+}
+.sidebar .nav-link.active {
+    background-color: var(--sidebar-link-active-bg);
+    color: var(--sidebar-link-hover-color);
+}
+.sidebar .logout-btn {
+    background-color: #dc3545;
+    color: #fff;
+    width: 100%;
+}
+
+.main-content {
+    margin-left: var(--sidebar-width);
+    width: calc(100% - var(--sidebar-width));
+    padding: 2rem;
+    /* Ajout du défilement pour le contenu principal */
+    height: 100vh;
+    overflow-y: auto;
+}
+
+.page-title {
+    font-weight: 300;
+    color: #343a40;
 }
 .card {
     border: none;
-    border-radius: 0.5rem;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    box-shadow: 0 0 20px rgba(0,0,0,0.05);
 }
-.card.dashboard-card { border-left: 4px solid var(--primary-color); }
-.card .card-header {
-    background-color: #fff;
-    font-weight: 600;
-    color: #333;
-    border-bottom: 1px solid #e9ecef;
+
+/* --- Styles pour le bouton Burger (caché par défaut) --- */
+.menu-toggle {
+    display: none; /* Caché sur la version desktop */
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 1100; /* Doit être au-dessus du menu */
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 5px;
+    font-size: 1.5rem;
+}
+
+/* Style pour les titres de catégorie dans le menu */
+.nav-category-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #8a96a3;
+    padding: 0.5rem 1rem;
+    margin-top: 0.5rem;
+    letter-spacing: 0.05em;
+    white-space: nowrap; /* Assure que les titres ne vont pas à la ligne */
+}
+/* --- Styles pour la version Mobile (Responsive) --- */
+@media (max-width: 768px) {
+    .menu-toggle {
+        display: block; /* On affiche le bouton burger */
+    }
+
+    .sidebar {
+        /* Le menu est translaté hors de l'écran par défaut */
+        transform: translateX(-100%); 
+    }
+
+    .sidebar.show {
+        /* La classe .show, ajoutée par JS, ramène le menu à l'écran */
+        transform: translateX(0);
+    }
+
+    .main-content {
+        /* Sur mobile, la marge est à 0 car le menu est caché */
+        margin-left: 0;
+        width: 100%;
+    }
+}
+/* --- Améliorations pour la vue mobile --- */
+@media (max-width: 576px) {
+  /* Cible l'en-tête des pages pour les empiler verticalement */
+  .page-header-mobile-stack {
+    flex-direction: column; /* Met les éléments en colonne */
+    align-items: center !important; 
+    gap: 1rem; /* Ajoute un espace entre le titre et le bouton */
+    text-align: center; /* Centre le texte à l'intérieur des éléments enfants */
+  }
 }
