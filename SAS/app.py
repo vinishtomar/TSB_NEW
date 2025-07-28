@@ -295,6 +295,38 @@ def edit_client(client_id):
         flash('Client mis à jour avec succès !', 'success')
         return redirect(url_for('client_profile', client_id=client.id))
     return render_template('main_template.html', view='client_form', form_title="Modifier le Client", client=client)
+@app.route('/candidate/add', methods=['GET', 'POST'])
+@login_required
+@role_required(['CEO', 'RH'])
+def add_candidate():
+    if request.method == 'POST':
+        new_candidate = Candidate(
+            full_name=request.form['full_name'],
+            email=request.form['email'],
+            phone=request.form.get('phone'),
+            position_applied_for=request.form['position_applied_for'],
+            notes=request.form.get('notes')
+        )
+        db.session.add(new_candidate)
+        db.session.commit()
+        flash('Nouveau candidat ajouté avec succès.', 'success')
+        return redirect(url_for('list_candidates'))
+
+    return render_template('main_template.html', view='candidate_form', form_title="Ajouter un Candidat")
+
+@app.route('/candidate/view/<int:candidate_id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['CEO', 'RH'])
+def view_candidate(candidate_id):
+    candidate = Candidate.query.get_or_404(candidate_id)
+    if request.method == 'POST':
+        candidate.status = request.form.get('status', candidate.status)
+        candidate.notes = request.form.get('notes', candidate.notes)
+        db.session.commit()
+        flash('Profil du candidat mis à jour.', 'success')
+        return redirect(url_for('view_candidate', candidate_id=candidate.id))
+        
+    return render_template('main_template.html', view='candidate_profile', candidate=candidate)
 
 @app.route('/Bienvenue')
 @login_required
