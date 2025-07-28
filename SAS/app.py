@@ -86,11 +86,16 @@ class Quote(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     quote_number = db.Column(db.String(50), unique=True, nullable=False)
     client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
+    
+    # AJOUTEZ CETTE LIGNE 👇
+    service_type = db.Column(db.String(200), nullable=True)
+    
     details = db.Column(db.Text)
     price = db.Column(db.Float)
     vat_rate = db.Column(db.Float, default=0.20)
     status = db.Column(db.String(50), default='Pending')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
     @property
     def total_price(self):
         return self.price * (1 + self.vat_rate) if self.price and self.vat_rate is not None else 0
@@ -486,12 +491,14 @@ def add_equipment():
 @role_required(['CEO', 'Finance'])
 def add_quote():
     if request.method == 'POST':
-        last_quote = Quote.query.order_by(Quote.id.desc()).first()
-        new_id = (last_quote.id + 1) if last_quote else 1
-        quote_number = f"DEV-{datetime.now().year}-{new_id:04d}"
+        # ... (code for quote_number) ...
         new_quote = Quote(
             quote_number=quote_number,
             client_id=request.form['client_id'],
+            
+            # AJOUTEZ CETTE LIGNE 👇
+            service_type=request.form['service_type'],
+
             details=request.form['details'],
             price=float(request.form['price']),
             vat_rate=float(request.form['vat_rate'])
