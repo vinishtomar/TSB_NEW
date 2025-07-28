@@ -16,6 +16,7 @@ from flask_login import (LoginManager, UserMixin, login_user, login_required,
 from flask_bcrypt import Bcrypt
 from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
+from weasyprint import HTML
 # --- APPLICATION SETUP ---
 app = Flask(__name__)
 bcrypt = Bcrypt(app)
