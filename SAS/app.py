@@ -108,6 +108,7 @@ class Employee(db.Model):
     phone = db.Column(db.String(50), nullable=True)
     hire_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
     salary = db.Column(db.Float, nullable=True)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
     leave_requests = db.relationship('LeaveRequest', backref='employee', lazy='dynamic')
     hebergements = db.relationship('Hebergement', secondary=hebergement_employee_association, back_populates='employees')
 class LeaveRequest(db.Model):
