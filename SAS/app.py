@@ -203,6 +203,27 @@ def list_clients():
     clients = Client.query.order_by(Client.name).all()
     return render_template('main_template.html', view='clients_list', clients=clients)
 
+# ADD THIS NEW ROUTE
+@app.route('/quote/pdf/<int:quote_id>')
+@login_required
+@role_required(['CEO', 'Finance']) # Protect the route
+def generate_quote_pdf(quote_id):
+    """Generates a PDF for a specific quote."""
+    # 1. Fetch the quote from the database
+    quote = Quote.query.get_or_404(quote_id)
+    
+    # 2. Render an HTML template with the quote's data
+    #    (You'll need to create this template, see step 2 below)
+    rendered_html = render_template('quote_pdf_template.html', quote=quote)
+    
+    # 3. Use WeasyPrint to convert the HTML to a PDF
+    pdf = HTML(string=rendered_html).write_pdf()
+    
+    # 4. Return the PDF as a response to the browser
+    return Response(pdf,
+                    mimetype='application/pdf',
+                    headers={'Content-Disposition': f'attachment;filename=devis_{quote.quote_number}.pdf'})
+
 @app.route('/planning')
 @login_required
 def list_planning():
