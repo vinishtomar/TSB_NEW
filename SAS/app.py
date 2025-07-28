@@ -673,21 +673,26 @@ def add_document_to_chantier(chantier_id):
         flash('Document lié au chantier avec succès.', 'success')
 
     return redirect(url_for('chantier_profile', chantier_id=chantier_id))
+
 # --- DATABASE AND APP INITIALIZATION ---
+# This code now runs automatically when the app starts
+with app.app_context():
+    print("--- Initialisation de la base de données... ---")
+    db.create_all()
+    default_users = {
+        'ceo': {'password': 'password', 'role': 'CEO'},
+        'rh': {'password': 'password', 'role': 'RH'},
+        'finance': {'password': 'password', 'role': 'Finance'},
+        'chef': {'password': 'password', 'role': 'Chef de projet'},
+    }
+    for username, details in default_users.items():
+        if not User.query.filter_by(username=username).first():
+            hashed_password = bcrypt.generate_password_hash(details['password']).decode('utf-8')
+            db.session.add(User(username=username, password_hash=hashed_password, role=details['role']))
+    db.session.commit()
+    print("--- Base de données prête. ---")
+
+# This block only runs for local development
 if __name__ == '__main__':
-    with app.app_context():
-        print("--- Initialisation de la base de données... ---")
-        db.create_all()
-        default_users = {
-            'ceo': {'password': 'password', 'role': 'CEO'},
-            'rh': {'password': 'password', 'role': 'RH'},
-            'finance': {'password': 'password', 'role': 'Finance'},
-            'chef': {'password': 'password', 'role': 'Chef de projet'},
-        }
-        for username, details in default_users.items():
-            if not User.query.filter_by(username=username).first():
-                hashed_password = bcrypt.generate_password_hash(details['password']).decode('utf-8')
-                db.session.add(User(username=username, password_hash=hashed_password, role=details['role']))
-        db.session.commit()
-        print("--- Base de données prête. ---")
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port, debug=True)
