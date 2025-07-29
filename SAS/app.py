@@ -112,11 +112,13 @@ class Employee(db.Model):
     hire_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
     salary = db.Column(db.Float, nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
+    
+    # Relations
     leave_requests = db.relationship('LeaveRequest', backref='employee', lazy='dynamic')
     hebergements = db.relationship('Hebergement', secondary=hebergement_employee_association, back_populates='employees')
-    # Foreign Key to User
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True, unique=True)
-
+    
+    # Foreign Key vers User
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), unique=True, nullable=True)
 class LeaveRequest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
@@ -498,28 +500,57 @@ def manage_users():
     return render_template('main_template.html', view='users_list', users=users)
 
 @app.route('/leaves/request', methods=['GET', 'POST'])
-@login_required
-@role_required(['CEO', 'RH'])
+@login_required # On enlève @role_required pour que tout le monde y accède
 def request_leave():
+    # Vérifier si l'utilisateur est lié à un profil employé
+    employee_profile = Employee.query.filter_by(user_id=current_user.id).first()
+    is_rh_or_ceo = current_user.role in ['CEO', 'RH']
+
+    # Si l'utilisateur n'est pas un RH et n'a pas de profil employé, on bloque.
+    if not is_rh_or_ceo and not employee_profile:
+        flash("Votre compte n'est pas lié à un profil employé. Contactez les RH.", "warning")
+        return redirect(url_for('bienvenue')) # Redirige vers une page générale
+
     if request.method == 'POST':
-        start_date = datetime.strptime(request.form['start_date'], '%Y-%m-%d').date()
-        end_date = datetime.strptime(request.form['end_date'], '%Y-%m-%d').date()
+        employee_id = request.form.get('employee_id')
+
+        # Si l'utilisateur n'est pas RH, l'ID employé est forcément le sien
+        if not is_rh_or_ceo:
+            employee_id = employee_profile.id
+        
+        # ... (le reste de la fonction avec les vérifications de date reste identique) ...
+        start_date_str = request.form.get('start_date')
+        end_date_str = request.form.get('end_date')
+
+        if not start_date_str or not end_date_str:
+            flash('Les dates de début et de fin sont obligatoires.', 'danger')
+            return redirect(url_for('request_leave'))
+
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            flash('Le format des dates est invalide.', 'danger')
+            return redirect(url_for('request_leave'))
+
         if start_date > end_date:
             flash('La date de début ne peut pas être après la date de fin.', 'danger')
             return redirect(url_for('request_leave'))
+        
         new_request = LeaveRequest(
-            employee_id=request.form['employee_id'],
-            leave_type=request.form['leave_type'],
+            employee_id=employee_id,
+            leave_type=request.form.get('leave_type'),
             start_date=start_date,
             end_date=end_date
         )
         db.session.add(new_request)
         db.session.commit()
         flash('Demande de congé soumise.', 'success')
-        return redirect(url_for('list_leaves'))
-    employees = Employee.query.all()
-    return render_template('main_template.html', view='leave_request_form', employees=employees, form_title="Demander un Congé")
+        return redirect(url_for('list_leaves') if is_rh_or_ceo else url_for('bienvenue'))
 
+    # Pour les RH, on envoie la liste de tous les employés
+    employees = Employee.query.all() if is_rh_or_ceo else []
+    return render_template('main_template.html', view='leave_request_form', employees=employees, form_title="Demander un Congé")
 @app.route('/equipment/add', methods=['GET', 'POST'])
 @login_required
 @role_required(['CEO', 'Chef de projet'])
