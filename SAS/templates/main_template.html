@@ -17,8 +17,6 @@
         {% elif 'facture' in view %}Factures
         {% elif 'planning' in view %}Planning
         {% elif 'document' in view %}Documents
-        {% elif 'pointeuse' in view %}Pointeuse
-        {% elif 'timesheets' in view %}Feuilles de Temps
         {% else %}TSB Manager
         {% endif %} - TSB Manager
     </title>
@@ -89,8 +87,6 @@
                             href="{{ url_for('list_clients') }}"><i class="bi bi-person-check-fill"></i> Clients</a>
                         <a class="nav-link {% if 'employee' in view %}active{% endif %}"
                             href="{{ url_for('list_employees') }}"><i class="bi bi-people-fill"></i> Employés</a>
-                        <a class="nav-link {% if view == 'timesheets_list' %}active{% endif %}"
-                            href="{{ url_for('list_timesheets') }}"><i class="bi bi-card-checklist"></i> Feuilles de Temps</a>
                         <a class="nav-link {% if 'leave' in view %}active{% endif %}"
                             href="{{ url_for('list_leaves') }}"><i class="bi bi-calendar-check-fill"></i> Congés</a>
                         <a class="nav-link {% if 'hebergement' in view %}active{% endif %}"
@@ -124,25 +120,25 @@
                     {% endif %}
 
                     <div class="mt-2">
-    <h3 class="nav-category-title">Mon Espace</h3>
-    <a class="nav-link {% if view == 'pointeuse' %}active{% endif %}"
-        href="{{ url_for('pointeuse') }}"><i class="bi bi-clock-history"></i> Ma Pointeuse</a>
-    <a class="nav-link {% if 'planning' in view %}active{% endif %}"
-        href="{{ url_for('list_planning') }}"><i class="bi bi-map-fill"></i> Planning</a>
-    <a class="nav-link {% if 'document' in view %}active{% endif %}"
-        href="{{ url_for('list_documents') }}"><i class="bi bi-folder-fill"></i> Documents</a>
+                        <h3 class="nav-category-title">Autres</h3>
+                        <a class="nav-link {% if 'planning' in view %}active{% endif %}"
+                            href="{{ url_for('list_planning') }}"><i class="bi bi-map-fill"></i> Planning</a>
+                        <a class="nav-link {% if 'document' in view %}active{% endif %}"
+                            href="{{ url_for('list_documents') }}"><i class="bi bi-folder-fill"></i> Documents</a>
 
-    <a class="nav-link" href="{{ url_for('request_leave') }}"><i class="bi bi-calendar-plus-fill"></i> Demander un Congé</a>
-
-    {% if current_user.role == 'CEO' %}
-    {% endif %}
-</div>
+                        {% if current_user.role == 'CEO' %}
+                        <a class="nav-link {% if 'users' in view %}active{% endif %}"
+                            href="{{ url_for('manage_users') }}"><i class="bi bi-person-gear"></i> Gestion
+                            Utilisateurs</a>
+                        {% endif %}
+                    </div>
 
                 </div>
             </nav>
 
             <div class="sidebar-footer">
                 <p class="text-white text-center">Mon rôle : {{ current_user.role }}</p>
+
                 <a href="{{ url_for('logout') }}" class="btn logout-btn"><i class="bi bi-box-arrow-left"></i>
                     Déconnexion</a>
             </div>
@@ -150,19 +146,6 @@
 
         <main class="main-content">
             <div class="container-fluid">
-                
-                {# --- GLOBAL ALERT MESSAGES --- #}
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                        {% for category, message in messages %}
-                        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                            {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                        {% endfor %}
-                    {% endif %}
-                {% endwith %}
-
                 {# --- Le contenu des pages commence ici --- #}
 
                 {% if view == 'dashboard' %}
@@ -195,9 +178,9 @@
                                         class="list-group-item d-flex justify-content-between align-items-center"><a
                                             href="{{ url_for('generate_quote_pdf', quote_id=quote.id) }}"
                                             target="_blank">#{{ quote.quote_number }}</a><span>{{ quote.client.name
-                                        }}</span><span class="fw-bold">{{ "%.2f"|format(quote.total_price) }}
-                                        €</span></li>{% else %}<li class="list-group-item text-center text-muted">
-                                    Aucun devis.</li>{% endfor %}</ul>
+                                            }}</span><span class="fw-bold">{{ "%.2f"|format(quote.total_price) }}
+                                            €</span></li>{% else %}<li class="list-group-item text-center text-muted">
+                                        Aucun devis.</li>{% endfor %}</ul>
                             </div>
                         </div>
                     </div>
@@ -215,109 +198,9 @@
                         </div>
                     </div>
                 </div>
-                
-                {% elif view == 'pointeuse' %}
-                <div class="page-header-mobile-stack mb-4">
-                    <h1 class="page-title">Ma Pointeuse</h1>
-                    <p class="text-muted">Enregistrez vos heures d'arrivée et de départ pour aujourd'hui.</p>
-                </div>
-                <div class="card text-center">
-                    <div class="card-header fs-5">
-                        Pointage du {{ datetime.utcnow().strftime('%d/%m/%Y') }}
-                    </div>
-                    <div class="card-body p-4">
-                        {% if not todays_entry or not todays_entry.check_in_time %}
-                            <h5 class="card-title">Vous n'avez pas encore pointé votre arrivée.</h5>
-                            <p class="card-text">Cliquez sur le bouton ci-dessous pour commencer votre journée.</p>
-                            <form method="POST">
-                                <input type="hidden" name="action" value="check_in">
-                                <button type="submit" class="btn btn-success btn-lg"><i class="bi bi-box-arrow-in-right me-2"></i>Pointer mon Arrivée</button>
-                            </form>
-                        {% elif not todays_entry.check_out_time %}
-                            <h5 class="card-title text-success">Journée en cours</h5>
-                            <p class="card-text">Vous avez pointé votre arrivée à : <strong>{{ todays_entry.check_in_time.strftime('%H:%M:%S') }}</strong></p>
-                            <form method="POST">
-                                <input type="hidden" name="action" value="check_out">
-                                <button type="submit" class="btn btn-danger btn-lg"><i class="bi bi-box-arrow-out-right me-2"></i>Pointer mon Départ</button>
-                            </form>
-                        {% else %}
-                            <h5 class="card-title text-primary">Pointage du jour terminé.</h5>
-                            <div class="row mt-4">
-                                <div class="col-md-6">
-                                    <p class="fs-5">Arrivée: <strong class="badge bg-success p-2">{{ todays_entry.check_in_time.strftime('%H:%M:%S') }}</strong></p>
-                                </div>
-                                <div class="col-md-6">
-                                    <p class="fs-5">Départ: <strong class="badge bg-danger p-2">{{ todays_entry.check_out_time.strftime('%H:%M:%S') }}</strong></p>
-                                </div>
-                            </div>
-                             {% if todays_entry.duration %}
-                                <p class="mt-3 fs-4">Temps de travail total: <strong>{{ todays_entry.duration }}</strong></p>
-                            {% endif %}
-                        {% endif %}
-                    </div>
-                    <div class="card-footer text-muted">
-                        N'oubliez pas de pointer votre départ en fin de journée.
-                    </div>
-                </div>
-                
-                {% elif view == 'timesheets_list' %}
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h1 class="page-title mb-0">Feuilles de Temps des employées</h1>
-                </div>
-                <div class="card">
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle">
-                                <thead>
-                                    <tr>
-                                        <th></th>
-                                        <th>Date</th>
-                                        <th>Heure d'arrivée</th>
-                                        <th>Heure de départ</th>
-                                        <th>Durée Totale</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for record in records %}
-                                    <tr>
-                                        <td><strong>{{ record.e.full_name }}</strong></td>
-                                        <td>{{ record.date.strftime('%d/%m/%Y') }}</td>
-                                        <td>
-                                            {% if record.check_in_time %}
-                                                <span class="badge bg-success">{{ record.check_in_time.strftime('%H:%M:%S') }}</span>
-                                            {% else %}
-                                                -
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if record.check_out_time %}
-                                                <span class="badge bg-danger">{{ record.check_out_time.strftime('%H:%M:%S') }}</span>
-                                            {% else %}
-                                                <span class="badge bg-warning text-dark">En cours...</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if record.duration %}
-                                                {{ record.duration }}
-                                            {% else %}
-                                                -
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td colspan="5" class="text-center text-muted">Aucun enregistrement de temps trouvé.</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
                 {% elif view == 'hebergements_list' %}
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h1 class="page-title mb-0">Hébergements des Employées</h1>
+                    <h1 class="page-title mb-0">Hébergements des Employés</h1>
                     <a href="{{ url_for('add_hebergement') }}" class="btn btn-primary"><i
                             class="bi bi-plus-circle-fill me-2"></i>Ajouter un Hébergement</a>
                 </div>
@@ -327,7 +210,7 @@
                             <table class="table table-hover">
                                 <thead>
                                     <tr>
-                                        <th>(s)</th>
+                                        <th>Employé(s)</th>
                                         <th>Adresse</th>
                                         <th>Début</th>
                                         <th>Fin</th>
@@ -339,10 +222,10 @@
                                     {% for hebergement in hebergements %}
                                     <tr>
                                         <td>
-                                            {% for e in hebergement.es %}
-                                            <span class="badge bg-secondary me-1">{{ e.full_name }}</span>
+                                            {% for employee in hebergement.employees %}
+                                            <span class="badge bg-secondary me-1">{{ employee.full_name }}</span>
                                             {% else %}
-                                            <span class="text-muted">Aucun  assigné</span>
+                                            <span class="text-muted">Aucun employé assigné</span>
                                             {% endfor %}
                                         </td>
                                         <td>{{ hebergement.address }}</td>
@@ -366,6 +249,7 @@
                     </div>
                 </div>
 
+                {# --- NOUVELLE VUE POUR LE FORMULAIRE D'HÉBERGEMENT --- #}
                 {% elif view == 'hebergement_form' %}
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h1 class="page-title mb-0">{{ form_title }}</h1>
@@ -407,7 +291,6 @@
                         </form>
                     </div>
                 </div>
-                
                 {% elif view == 'chantiers_list' %}
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h1 class="page-title mb-0">Liste des Chantiers</h1>
@@ -448,7 +331,6 @@
                         </div>
                     </div>
                 </div>
-
                 {% elif view == 'client_profile' %}
                 <div class="d-flex justify-content-between align-items-center mb-4 page-header-mobile-stack">
                     <h1 class="page-title mb-0"><i class="bi bi-person-fill me-2"></i>{{ client.name }}</h1><a
@@ -480,11 +362,10 @@
                                         quote.created_at.strftime('%d/%m/%Y') }}</span><span
                                         class="badge bg-{{'success' if quote.status=='Approved' else 'warning' if quote.status=='Pending' else 'danger'}}">{{
                                         quote.status }}</span></li>{% else %}<li class="list-group-item text-muted">
-                                Aucun devis pour ce client.</li>{% endfor %}</ul>
+                                    Aucun devis pour ce client.</li>{% endfor %}</ul>
                         </div>
                     </div>
                 </div>
-
                 {% elif view == 'client_form' %}
                 <div class="page-header-mobile-stack mb-4">
                     <h1 class="page-title">{{ form_title }}</h1>
@@ -508,7 +389,7 @@
                                     rows="3">{{ client.address if client else '' }}</textarea></div>
                             <div class="mb-3"><label for="status" class="form-label">Status</label><select
                                     class="form-select" id="status" name="status">{% set statuses = ['Prospect',
-                                'Ongoing', 'Completed', 'Needs Follow-up'] %}{% for status in statuses %}<option
+                                    'Ongoing', 'Completed', 'Needs Follow-up'] %}{% for status in statuses %}<option
                                         value="{{ status }}" {% if client and client.status==status %}selected{% endif
                                         %}>{{ status }}</option>{% endfor %}</select></div><button type="submit"
                                 class="btn btn-primary">Enregistrer</button><a href="{{ url_for('list_clients') }}"
@@ -521,6 +402,23 @@
                 <div class="d-flex justify-content-between align-items-center mb-4 page-header-mobile-stack">
                     <h1 class="page-title mb-0">Gestion de l'Équipement</h1><a href="{{ url_for('add_equipment') }}"
                         class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Ajouter</a>
+                </div>
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <form class="row g-2 align-items-end" method="GET">
+                            <div class="col-auto"><label for="status" class="form-label">Filtrer par
+                                    statut:</label><select class="form-select" id="status" name="status"
+                                    onchange="this.form.submit()">
+                                    <option value="all" {% if current_filter=='all' %}selected{% endif %}>Tous</option>
+                                    <option value="In Service" {% if current_filter=='In Service' %}selected{% endif %}>
+                                        In Service</option>
+                                    <option value="Broken" {% if current_filter=='Broken' %}selected{% endif %}>Broken
+                                    </option>
+                                    <option value="Out of Order" {% if current_filter=='Out of Order' %}selected{% endif
+                                        %}>Out of Order</option>
+                                </select></div>
+                        </form>
+                    </div>
                 </div>
                 <div class="card">
                     <div class="card-body">
@@ -551,7 +449,6 @@
                         </div>
                     </div>
                 </div>
-
                 {% elif view == 'equipment_form' %}
                 <div class="page-header-mobile-stack mb-4">
                     <h1 class="page-title">Ajouter un Équipement</h1>
@@ -629,7 +526,6 @@
                         </div>
                     </div>
                 </div>
-
                 {% elif view == 'quote_form' %}
                 <div class="page-header-mobile-stack mb-4">
                     <h1 class="page-title">Générateur de Devis</h1>
@@ -707,7 +603,6 @@
                         </div>
                     </div>
                 </div>
-
                 {% elif view == 'employee_form' %}
                 <div class="page-header-mobile-stack mb-4">
                     <h1 class="page-title">{{ form_title }}</h1>
@@ -771,124 +666,68 @@
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-    {% for leave in leaves %}
-    <tr>
-        <td><strong>{{ leave.employee.full_name }}</strong></td>
-        <td>{{ leave.leave_type }}</td>
-        <td>{{ leave.start_date.strftime('%d/%m/%Y') }} - {{ leave.end_date.strftime('%d/%m/%Y') }}</td>
-        <td>{{ (leave.end_date - leave.start_date).days + 1 }} jours</td>
-        <td>
-            <span class="badge bg-{{'success' if leave.status=='Approved' else 'warning' if leave.status=='Pending' else 'danger'}}">{{ leave.status }}</span>
-        </td>
-        <td>
-            {% if leave.status == 'Pending' %}
-            <form action="{{ url_for('update_leave_status', leave_id=leave.id) }}" method="POST" class="d-inline">
-                <button type="submit" name="status" value="Approved" class="btn btn-sm btn-success">Approuver</button>
-            </form>
-            <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal-{{ leave.id }}">
-                Rejeter
-            </button>
-            {% else %}
-            -
-            {% endif %}
-        </td>
-    </tr>
-    
-    {% if leave.status == 'Rejected' and leave.rejection_reason %}
-    <tr class="table-light">
-        <td colspan="6">
-            <p class="mb-1"><strong>Motif du refus :</strong> {{ leave.rejection_reason }}</p>
-            {% if leave.proposed_start_date %}
-            <small class="text-muted"><strong>Nouvelles dates proposées :</strong> du {{ leave.proposed_start_date.strftime('%d/%m/%Y') }} au {{ leave.proposed_end_date.strftime('%d/%m/%Y') }}</small>
-            {% endif %}
-        </td>
-    </tr>
-    {% endif %}
-
-    <div class="modal fade" id="rejectModal-{{ leave.id }}" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <form action="{{ url_for('update_leave_status', leave_id=leave.id) }}" method="POST">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Refuser la demande de {{ leave.employee.full_name }}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <input type="hidden" name="status" value="Rejected">
-                        <div class="mb-3">
-                            <label for="rejection_reason-{{ leave.id }}" class="form-label">Raison du refus (Optionnel)</label>
-                            <textarea class="form-control" name="rejection_reason" id="rejection_reason-{{ leave.id }}" rows="3"></textarea>
-                        </div>
-                        <p class="form-label">Proposer de nouvelles dates (Optionnel)</p>
-                        <div class="row">
-                            <div class="col-6">
-                                <label for="proposed_start_date-{{ leave.id }}" class="form-label">Date de début</label>
-                                <input type="date" class="form-control" name="proposed_start_date" id="proposed_start_date-{{ leave.id }}">
-                            </div>
-                            <div class="col-6">
-                                <label for="proposed_end_date-{{ leave.id }}" class="form-label">Date de fin</label>
-                                <input type="date" class="form-control" name="proposed_end_date" id="proposed_end_date-{{ leave.id }}">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                        <button type="submit" class="btn btn-danger">Confirmer le Refus</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    {% else %}
-    {% endfor %}
-</tbody>
+                                <tbody>{% for leave in leaves %}<tr>
+                                        <td><strong>{{ leave.employee.full_name }}</strong></td>
+                                        <td>{{ leave.leave_type }}</td>
+                                        <td>{{ leave.start_date.strftime('%d/%m/%Y') }} - {{
+                                            leave.end_date.strftime('%d/%m/%Y') }}</td>
+                                        <td>{{ (leave.end_date - leave.start_date).days + 1 }} jours</td>
+                                        <td><span
+                                                class="badge bg-{{'success' if leave.status=='Approved' else 'warning' if leave.status=='Pending' else 'danger'}}">{{
+                                                leave.status }}</span></td>
+                                        <td>{% if leave.status == 'Pending' %}<form
+                                                action="{{ url_for('update_leave_status', leave_id=leave.id) }}"
+                                                method="POST" class="d-inline"><button type="submit" name="status"
+                                                    value="Approved" class="btn btn-sm btn-success">Approuver</button>
+                                            </form>
+                                            <form action="{{ url_for('update_leave_status', leave_id=leave.id) }}"
+                                                method="POST" class="d-inline"><button type="submit" name="status"
+                                                    value="Rejected" class="btn btn-sm btn-danger">Rejeter</button>
+                                            </form>{% else %}-{% endif %}
+                                        </td>
+                                    </tr>{% else %}<tr>
+                                        <td colspan="6" class="text-center text-muted">Aucune demande de congé trouvée.
+                                        </td>
+                                    </tr>{% endfor %}</tbody>
                             </table>
                         </div>
                     </div>
                 </div>
-
                 {% elif view == 'leave_request_form' %}
-<div class="page-header-mobile-stack mb-4">
-    <h1 class="page-title">{{ form_title }}</h1>
-</div>
-<div class="card">
-    <div class="card-body">
-        <form method="POST">
+                <div class="page-header-mobile-stack mb-4">
+                    <h1 class="page-title">{{ form_title }}</h1>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <form method="POST">
+                            <div class="mb-3"><label for="employee_id" class="form-label">Employé</label><select
+                                    class="form-select" id="employee_id" name="employee_id" required>
+                                    <option value="">Sélectionner un employé...</option>{% for employee in employees %}
+                                    <option value="{{ employee.id }}">{{ employee.full_name }}</option>{% endfor %}
+                                </select></div>
+                            <div class="mb-3"><label for="leave_type" class="form-label">Type de Congé</label><select
+                                    class="form-select" id="leave_type" name="leave_type">
+                                    <option value="Annual Leave">Congé Annuel</option>
+                                    <option value="Sick Leave">Arrêt Maladie</option>
+                                    <option value="Unpaid Leave">Congé sans Solde</option>
+                                    <option value="Special">Congé Exceptionnel</option>
+                                </select></div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3"><label for="start_date" class="form-label">Date de
+                                        Début</label><input type="date" class="form-control" id="start_date"
+                                        name="start_date" required></div>
+                                <div class="col-md-6 mb-3"><label for="end_date" class="form-label">Date de
+                                        Fin</label><input type="date" class="form-control" id="end_date" name="end_date"
+                                        required></div>
+                            </div>
+                            <div class="mb-3"><label for="reason" class="form-label">Raison (Optionnel)</label><textarea
+                                    class="form-control" id="reason" name="reason" rows="3"></textarea></div><button
+                                type="submit" class="btn btn-primary">Soumettre la Demande</button><a
+                                href="{{ url_for('list_leaves') }}" class="btn btn-light">Annuler</a>
+                        </form>
+                    </div>
+                </div>
 
-            {% if current_user.role in ['CEO', 'RH'] %}
-            <div class="mb-3">
-                <label for="employee_id" class="form-label">Employé</label>
-                <select class="form-select" id="employee_id" name="employee_id" required>
-                    <option value="">Sélectionner un employé...</option>
-                    {% for employee in employees %}
-                    <option value="{{ employee.id }}">{{ employee.full_name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            {% endif %}
-            <div class="mb-3"><label for="leave_type" class="form-label">Type de Congé</label><select
-                    class="form-select" id="leave_type" name="leave_type">
-                    <option value="Annual Leave">Congé Annuel</option>
-                    <option value="Sick Leave">Arrêt Maladie</option>
-                    <option value="Unpaid Leave">Congé sans Solde</option>
-                    <option value="Special">Congé Exceptionnel</option>
-                </select></div>
-            <div class="row">
-                <div class="col-md-6 mb-3"><label for="start_date" class="form-label">Date de
-                        Début</label><input type="date" class="form-control" id="start_date"
-                        name="start_date" required></div>
-                <div class="col-md-6 mb-3"><label for="end_date" class="form-label">Date de
-                        Fin</label><input type="date" class="form-control" id="end_date" name="end_date"
-                        required></div>
-            </div>
-            <div class="mb-3"><label for="reason" class="form-label">Raison (Optionnel)</label><textarea
-                    class="form-control" id="reason" name="reason" rows="3"></textarea></div><button
-                    type="submit" class="btn btn-primary">Soumettre la Demande</button><a
-                    href="{{ url_for('list_leaves') }}" class="btn btn-light">Annuler</a>
-        </form>
-    </div>
-</div>
                 {% elif view == 'candidates_list' %}
                 <div class="d-flex justify-content-between align-items-center mb-4 page-header-mobile-stack">
                     <h1 class="page-title mb-0">Recrutement - Candidats</h1><a href="{{ url_for('add_candidate') }}"
@@ -925,7 +764,6 @@
                         </div>
                     </div>
                 </div>
-                
                 {% elif view == 'candidate_profile' %}
                 <div class="page-header-mobile-stack mb-4">
                     <h1 class="page-title"><i class="bi bi-person-fill me-2"></i>Profil du Candidat</h1>
@@ -972,7 +810,6 @@
                         </div>
                     </div>
                 </div>
-
                 {% elif view == 'candidate_form' %}
                 <div class="page-header-mobile-stack mb-4">
                     <h1 class="page-title">{{ form_title }}</h1>
@@ -1003,6 +840,14 @@
                     </div>
                 </div>
 
+                {% elif view == 'chantiers_list' %}
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="page-title mb-0">Liste des Chantiers</h1><a href="#" class="btn btn-primary"><i
+                            class="bi bi-plus-circle-fill me-2"></i>Nouveau Chantier</a>
+                </div>
+                <div class="card">
+                    <div class="card-body text-center text-muted">La liste des chantiers apparaîtra ici.</div>
+                </div>
                 {% elif view == 'sav_list' %}
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h1 class="page-title mb-0">Tickets SAV</h1>
@@ -1010,38 +855,9 @@
                             class="bi bi-plus-circle-fill me-2"></i>Nouveau Ticket</a>
                 </div>
                 <div class="card">
-                     <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle">
-                                <thead>
-                                    <tr>
-                                        <th>Ticket N°</th>
-                                        <th>Client</th>
-                                        <th>Description</th>
-                                        <th>Statut</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for ticket in tickets %}
-                                    <tr>
-                                        <td><strong>{{ ticket.ticket_number }}</strong></td>
-                                        <td>{{ ticket.client.name }}</td>
-                                        <td>{{ ticket.description|truncate(80) }}</td>
-                                        <td><span class="badge bg-info text-dark">{{ ticket.status }}</span></td>
-                                        <td><a href="#" class="btn btn-sm btn-outline-primary disabled">Voir</a></td>
-                                    </tr>
-                                    {% else %}
-                                    <tr>
-                                        <td colspan="5" class="text-center text-muted">Aucun ticket SAV trouvé.</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                    <div class="card-body text-center text-muted">La liste des tickets SAV apparaîtra ici.</div>
                 </div>
-                
+
                 {% elif view == 'clients_list' %}
                 <div class="d-flex justify-content-between align-items-center mb-4 page-header-mobile-stack">
                     <h1 class="page-title mb-0">Liste des Clients</h1>
@@ -1082,7 +898,6 @@
                         </div>
                     </div>
                 </div>
-                
                 {% elif view == 'factures_list' %}
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h1 class="page-title mb-0">Liste des Factures</h1>
@@ -1090,95 +905,45 @@
                             class="bi bi-plus-circle-fill me-2"></i>Nouvelle Facture</a>
                 </div>
                 <div class="card">
-                    <div class="card-body">
-                       <div class="table-responsive">
-                           <table class="table table-hover align-middle">
-                               <thead>
-                                   <tr>
-                                       <th>Facture N°</th>
-                                       <th>Client</th>
-                                       <th>Montant</th>
-                                       <th>Date d'échéance</th>
-                                       <th>Statut</th>
-                                       <th>Actions</th>
-                                   </tr>
-                               </thead>
-                               <tbody>
-                                   {% for facture in factures %}
-                                   <tr>
-                                       <td><strong>{{ facture.invoice_number }}</strong></td>
-                                       <td>{{ facture.client.name }}</td>
-                                       <td>{{ "%.2f"|format(facture.amount) }} €</td>
-                                       <td>{{ facture.due_date.strftime('%d/%m/%Y') if facture.due_date else '-' }}</td>
-                                       <td><span class="badge bg-secondary">{{ facture.status }}</span></td>
-                                       <td>
-                                            {% if facture.pdf_filename %}
-                                            <a href="#" class="btn btn-sm btn-outline-danger disabled">PDF</a>
-                                            {% else %}
-                                            -
-                                            {% endif %}
-                                       </td>
-                                   </tr>
-                                   {% else %}
-                                   <tr>
-                                       <td colspan="6" class="text-center text-muted">Aucune facture trouvée.</td>
-                                   </tr>
-                                   {% endfor %}
-                               </tbody>
-                           </table>
-                       </div>
-                   </div>
+                    <div class="card-body text-center text-muted">La liste des factures apparaîtra ici.</div>
                 </div>
-                
                 {% elif view == 'planning_list' %}
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h1 class="page-title mb-0">Planning</h1><a href="{{ url_for('add_planning_event') }}"
                         class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Nouvel Événement</a>
                 </div>
                 <div class="card">
-                     <div class="card-body">
-                         <ul class="list-group">
-                             {% for event in events %}
-                                 <li class="list-group-item">
-                                     <strong>{{ event.title }}</strong><br>
-                                     <small class="text-muted">
-                                         Du {{ event.start_time.strftime('%d/%m/%Y %H:%M') }} au {{ event.end_time.strftime('%d/%m/%Y %H:%M') }}
-                                     </small>
-                                 </li>
-                             {% else %}
-                                 <li class="list-group-item text-center text-muted">Aucun événement planifié.</li>
-                             {% endfor %}
-                         </ul>
-                     </div>
+                    <div class="card-body text-center text-muted">Le calendrier du planning apparaîtra ici.</div>
                 </div>
-                
                 {% elif view == 'documents_list' %}
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h1 class="page-title mb-0">Gestion des Documents</h1>
+
                     <a href="{{ url_for('add_document') }}" class="btn btn-primary"><i
                             class="bi bi-plus-circle-fill me-2"></i>Ajouter un document</a>
                 </div>
+
                 <div class="card">
                     <div class="card-body">
                         <div class="table-responsive">
                             <table class="table table-hover align-middle">
                                 <thead>
                                     <tr>
-                                        <th>Nom du document</th>
+                                        <th>Nom du fichier</th>
                                         <th>Propriétaire</th>
                                         <th>Date d'ajout</th>
-                                        <th>Lien</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {% for doc in documents %}
                                     <tr>
-                                        <td><i class="bi bi-file-earmark me-2"></i><strong>{{ doc.name }}</strong>
+                                        <td><i class="bi bi-file-earmark me-2"></i><strong>{{ doc.filename }}</strong>
                                         </td>
                                         <td>{{ doc.owner.username }}</td>
                                         <td>{{ doc.upload_date.strftime('%d/%m/%Y') }}</td>
                                         <td>
-                                            <a href="{{ doc.url }}" target="_blank" class="btn btn-sm btn-outline-primary">Ouvrir le lien</a>
+                                            <a href="#" class="btn btn-sm btn-outline-primary disabled">Télécharger</a>
                                         </td>
                                     </tr>
                                     {% else %}
@@ -1192,6 +957,7 @@
                     </div>
                 </div>
 
+                {# --- NOUVELLE VUE POUR LA GESTION DES UTILISATEURS --- #}
                 {% elif view == 'sav_form' %}
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h1 class="page-title mb-0">{{ form_title }}</h1>
@@ -1219,44 +985,44 @@
                 </div>
 
                 {% elif view == 'facture_form' %}
-                <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">{{ form_title }}</h1></div>
-                <div class="card">
-                    <div class="card-body">
-                        <form method="POST" enctype="multipart/form-data">
-                            <div class="mb-3">
-                                <label for="client_id" class="form-label">Client</label>
-                                <select name="client_id" id="client_id" class="form-select" required>
-                                    <option value="">Sélectionner un client...</option>
-                                    {% for client in clients %}<option value="{{ client.id }}">{{ client.name }}</option>{% endfor %}
-                                </select>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="amount" class="form-label">Montant Total TTC</label>
-                                    <div class="input-group">
-                                        <input type="number" step="0.01" class="form-control" name="amount" id="amount" required>
-                                        <span class="input-group-text">€</span>
-                                    </div>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="due_date" class="form-label">Date d'échéance</label>
-                                    <input type="date" class="form-control" name="due_date" id="due_date">
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="pdf_file" class="form-label">Fichier PDF (Optionnel)</label>
-                                <input class="form-control" type="file" id="pdf_file" name="pdf_file" accept=".pdf">
-                            </div>
-                            <button type="submit" class="btn btn-primary">Créer la Facture</button>
-                            <a href="{{ url_for('list_factures') }}" class="btn btn-light">Annuler</a>
-                        </form>
+<div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">{{ form_title }}</h1></div>
+<div class="card">
+    <div class="card-body">
+        <form method="POST" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label for="client_id" class="form-label">Client</label>
+                <select name="client_id" id="client_id" class="form-select" required>
+                    <option value="">Sélectionner un client...</option>
+                    {% for client in clients %}<option value="{{ client.id }}">{{ client.name }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="amount" class="form-label">Montant Total TTC</label>
+                    <div class="input-group">
+                        <input type="number" step="0.01" class="form-control" name="amount" id="amount" required>
+                        <span class="input-group-text">€</span>
                     </div>
                 </div>
-                
+                <div class="col-md-6 mb-3">
+                    <label for="due_date" class="form-label">Date d'échéance</label>
+                    <input type="date" class="form-control" name="due_date" id="due_date">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label for="pdf_file" class="form-label">Fichier PDF (Optionnel)</label>
+                <input class="form-control" type="file" id="pdf_file" name="pdf_file" accept=".pdf">
+            </div>
+            <button type="submit" class="btn btn-primary">Créer la Facture</button>
+            <a href="{{ url_for('list_factures') }}" class="btn btn-light">Annuler</a>
+        </form>
+    </div>
+</div>
                 {% elif view == 'users_list' %}
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h1 class="page-title mb-0">Gestion des Utilisateurs</h1>
                 </div>
+
                 <div class="card mb-4">
                     <div class="card-header">Ajouter un nouvel utilisateur</div>
                     <div class="card-body">
@@ -1278,6 +1044,7 @@
                         </form>
                     </div>
                 </div>
+
                 <div class="card">
                     <div class="card-header">Utilisateurs existants</div>
                     <div class="card-body">
@@ -1316,7 +1083,7 @@
                         </div>
                     </div>
                 </div>
-                
+                {# --- NOUVELLE VUE POUR MODIFIER UN UTILISATEUR --- #}
                 {% elif view == 'planning_form' %}
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h1 class="page-title mb-0">{{ form_title }}</h1>
@@ -1349,11 +1116,11 @@
                         </form>
                     </div>
                 </div>
-                
                 {% elif view == 'user_edit_form' %}
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h1 class="page-title mb-0">Modifier l'utilisateur : {{ user.username }}</h1>
                 </div>
+
                 <div class="card">
                     <div class="card-body">
                         <form method="POST">
@@ -1376,7 +1143,6 @@
                         </form>
                     </div>
                 </div>
-
                 {% elif view == 'document_form' %}
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h1 class="page-title mb-0">Ajouter un document</h1>
@@ -1384,13 +1150,10 @@
                 <div class="card">
                     <div class="card-body">
                         <form method="POST">
-                             <div class="mb-3">
-                                <label for="name" class="form-label">Nom du document</label>
-                                <input type="text" class="form-control" name="name" id="name" placeholder="Ex: Plan d'étage" required>
-                            </div>
                             <div class="mb-3">
-                                <label for="url" class="form-label">URL du document</label>
-                                <input type="url" class="form-control" name="url" id="url" placeholder="https://..." required>
+                                <label for="filename" class="form-label">Nom du fichier</label>
+                                <input type="text" class="form-control" name="filename" id="filename"
+                                    placeholder="Ex: plan_etage_1.pdf" required>
                             </div>
                             <button type="submit" class="btn btn-primary">Enregistrer</button>
                             <a href="{{ url_for('list_documents') }}" class="btn btn-light">Annuler</a>
@@ -1403,6 +1166,7 @@
                     <h1 class="page-title">Bienvenue, {{ current_user.username }} !</h1>
                     <p class="text-muted mb-4">Voici un accès rapide aux sections qui vous sont autorisées.</p>
                 </div>
+
                 <div class="row">
                     {% if current_user.role == 'RH' %}
                     <div class="col-md-4 mb-3">
@@ -1439,8 +1203,19 @@
                         </div>
                     </div>
                     {% endif %}
-                </div>
 
+                    {# --- Carte visible par tous les non-CEOs --- #}
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body text-center d-flex flex-column">
+                                <i class="bi bi-person-check-fill fs-1 text-secondary"></i>
+                                <h5 class="card-title mt-3">Sections Communes</h5>
+                                <p class="card-text">Gérer les clients, le planning et les documents.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
                 {% elif view == 'chantier_form' %}
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h1 class="page-title mb-0">{{ form_title }}</h1>
