@@ -49,21 +49,9 @@ class User(db.Model, UserMixin):
     password_hash = db.Column(db.String(120), nullable=False)
     role = db.Column(db.String(50), nullable=False, default="user")
     documents = db.relationship('Document', backref='owner', lazy=True)
-    # Relationship to Employee
-    employee = db.relationship('Employee', backref='user', uselist=False)
+    # Relation corrigée
+    employee = db.relationship('Employee', back_populates='user', uselist=False)
 
-class LeaveRequest(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
-    leave_type = db.Column(db.String(50), nullable=False, default='Annual Leave')
-    start_date = db.Column(db.Date, nullable=False)
-    end_date = db.Column(db.Date, nullable=False)
-    status = db.Column(db.String(50), nullable=False, default='Pending')
-    
-    # AJOUTEZ CES 3 LIGNES 👇
-    rejection_reason = db.Column(db.Text, nullable=True)
-    proposed_start_date = db.Column(db.Date, nullable=True)
-    proposed_end_date = db.Column(db.Date, nullable=True)
 
 class Client(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -113,13 +101,14 @@ class Employee(db.Model):
     salary = db.Column(db.Float, nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     
-    # Relations
-    leave_requests = db.relationship('LeaveRequest', backref='employee', lazy='dynamic')
-    hebergements = db.relationship('Hebergement', secondary=hebergement_employee_association, back_populates='employees')
-    
     # Foreign Key vers User
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), unique=True, nullable=True)
-
+    
+    # Relations corrigées
+    user = db.relationship('User', back_populates='employee')
+    leave_requests = db.relationship('LeaveRequest', back_populates='employee', lazy='dynamic')
+    hebergements = db.relationship('Hebergement', secondary=hebergement_employee_association, back_populates='employees')
+    timesheets = db.relationship('TimeSheet', back_populates='employee')
 class Candidate(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     full_name = db.Column(db.String(150), nullable=False)
@@ -178,6 +167,21 @@ class Hebergement(db.Model):
     notes = db.Column(db.Text, nullable=True)
     employees = db.relationship('Employee', secondary=hebergement_employee_association, back_populates='hebergements')
 
+
+class LeaveRequest(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
+    leave_type = db.Column(db.String(50), nullable=False, default='Annual Leave')
+    start_date = db.Column(db.Date, nullable=False)
+    end_date = db.Column(db.Date, nullable=False)
+    status = db.Column(db.String(50), nullable=False, default='Pending')
+    rejection_reason = db.Column(db.Text, nullable=True)
+    proposed_start_date = db.Column(db.Date, nullable=True)
+    proposed_end_date = db.Column(db.Date, nullable=True)
+    
+    # Relation ajoutée
+    employee = db.relationship('Employee', back_populates='leave_requests')
+
 # NEW MODEL FOR TIME TRACKING
 class TimeSheet(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -186,12 +190,14 @@ class TimeSheet(db.Model):
     check_in_time = db.Column(db.DateTime, nullable=True)
     check_out_time = db.Column(db.DateTime, nullable=True)
 
-    employee = db.relationship('Employee', backref='timesheets')
+    # Relation corrigée
+    employee = db.relationship('Employee', back_populates='timesheets')
 
     @property
     def duration(self):
         if self.check_in_time and self.check_out_time:
-            return self.check_out_time - self.check_in_time
+            delta = self.check_out_time - self.check_in_time
+            return str(delta).split('.')[0]
         return None
 
 # --- AUTHENTICATION & CORE ROUTES ---
