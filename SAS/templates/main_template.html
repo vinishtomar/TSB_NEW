@@ -124,20 +124,19 @@
                     {% endif %}
 
                     <div class="mt-2">
-                        <h3 class="nav-category-title">Mon Espace</h3>
-                        <a class="nav-link {% if view == 'pointeuse' %}active{% endif %}"
-                            href="{{ url_for('pointeuse') }}"><i class="bi bi-clock-history"></i> Ma Pointeuse</a>
-                        <a class="nav-link {% if 'planning' in view %}active{% endif %}"
-                            href="{{ url_for('list_planning') }}"><i class="bi bi-map-fill"></i> Planning</a>
-                        <a class="nav-link {% if 'document' in view %}active{% endif %}"
-                            href="{{ url_for('list_documents') }}"><i class="bi bi-folder-fill"></i> Documents</a>
+    <h3 class="nav-category-title">Mon Espace</h3>
+    <a class="nav-link {% if view == 'pointeuse' %}active{% endif %}"
+        href="{{ url_for('pointeuse') }}"><i class="bi bi-clock-history"></i> Ma Pointeuse</a>
+    <a class="nav-link {% if 'planning' in view %}active{% endif %}"
+        href="{{ url_for('list_planning') }}"><i class="bi bi-map-fill"></i> Planning</a>
+    <a class="nav-link {% if 'document' in view %}active{% endif %}"
+        href="{{ url_for('list_documents') }}"><i class="bi bi-folder-fill"></i> Documents</a>
 
-                        {% if current_user.role == 'CEO' %}
-                        <a class="nav-link {% if 'users' in view %}active{% endif %}"
-                            href="{{ url_for('manage_users') }}"><i class="bi bi-person-gear"></i> Gestion
-                            Utilisateurs</a>
-                        {% endif %}
-                    </div>
+    <a class="nav-link" href="{{ url_for('request_leave') }}"><i class="bi bi-calendar-plus-fill"></i> Demander un Congé</a>
+
+    {% if current_user.role == 'CEO' %}
+    {% endif %}
+</div>
 
                 </div>
             </nav>
@@ -850,40 +849,46 @@
                 </div>
 
                 {% elif view == 'leave_request_form' %}
-                <div class="page-header-mobile-stack mb-4">
-                    <h1 class="page-title">{{ form_title }}</h1>
-                </div>
-                <div class="card">
-                    <div class="card-body">
-                        <form method="POST">
-                            <div class="mb-3"><label for="employee_id" class="form-label">Employé</label><select
-                                    class="form-select" id="employee_id" name="employee_id" required>
-                                    <option value="">Sélectionner un employé...</option>{% for employee in employees %}
-                                    <option value="{{ employee.id }}">{{ employee.full_name }}</option>{% endfor %}
-                                </select></div>
-                            <div class="mb-3"><label for="leave_type" class="form-label">Type de Congé</label><select
-                                    class="form-select" id="leave_type" name="leave_type">
-                                    <option value="Annual Leave">Congé Annuel</option>
-                                    <option value="Sick Leave">Arrêt Maladie</option>
-                                    <option value="Unpaid Leave">Congé sans Solde</option>
-                                    <option value="Special">Congé Exceptionnel</option>
-                                </select></div>
-                            <div class="row">
-                                <div class="col-md-6 mb-3"><label for="start_date" class="form-label">Date de
-                                        Début</label><input type="date" class="form-control" id="start_date"
-                                        name="start_date" required></div>
-                                <div class="col-md-6 mb-3"><label for="end_date" class="form-label">Date de
-                                        Fin</label><input type="date" class="form-control" id="end_date" name="end_date"
-                                        required></div>
-                            </div>
-                            <div class="mb-3"><label for="reason" class="form-label">Raison (Optionnel)</label><textarea
-                                    class="form-control" id="reason" name="reason" rows="3"></textarea></div><button
-                                type="submit" class="btn btn-primary">Soumettre la Demande</button><a
-                                href="{{ url_for('list_leaves') }}" class="btn btn-light">Annuler</a>
-                        </form>
-                    </div>
-                </div>
+<div class="page-header-mobile-stack mb-4">
+    <h1 class="page-title">{{ form_title }}</h1>
+</div>
+<div class="card">
+    <div class="card-body">
+        <form method="POST">
 
+            {% if current_user.role in ['CEO', 'RH'] %}
+            <div class="mb-3">
+                <label for="employee_id" class="form-label">Employé</label>
+                <select class="form-select" id="employee_id" name="employee_id" required>
+                    <option value="">Sélectionner un employé...</option>
+                    {% for employee in employees %}
+                    <option value="{{ employee.id }}">{{ employee.full_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <div class="mb-3"><label for="leave_type" class="form-label">Type de Congé</label><select
+                    class="form-select" id="leave_type" name="leave_type">
+                    <option value="Annual Leave">Congé Annuel</option>
+                    <option value="Sick Leave">Arrêt Maladie</option>
+                    <option value="Unpaid Leave">Congé sans Solde</option>
+                    <option value="Special">Congé Exceptionnel</option>
+                </select></div>
+            <div class="row">
+                <div class="col-md-6 mb-3"><label for="start_date" class="form-label">Date de
+                        Début</label><input type="date" class="form-control" id="start_date"
+                        name="start_date" required></div>
+                <div class="col-md-6 mb-3"><label for="end_date" class="form-label">Date de
+                        Fin</label><input type="date" class="form-control" id="end_date" name="end_date"
+                        required></div>
+            </div>
+            <div class="mb-3"><label for="reason" class="form-label">Raison (Optionnel)</label><textarea
+                    class="form-control" id="reason" name="reason" rows="3"></textarea></div><button
+                    type="submit" class="btn btn-primary">Soumettre la Demande</button><a
+                    href="{{ url_for('list_leaves') }}" class="btn btn-light">Annuler</a>
+        </form>
+    </div>
+</div>
                 {% elif view == 'candidates_list' %}
                 <div class="d-flex justify-content-between align-items-center mb-4 page-header-mobile-stack">
                     <h1 class="page-title mb-0">Recrutement - Candidats</h1><a href="{{ url_for('add_candidate') }}"
