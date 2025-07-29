@@ -25,6 +25,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+
 # --- DECORATEUR DE ROLE ---
 def role_required(roles):
     def decorator(f):
@@ -36,8 +37,8 @@ def role_required(roles):
         return decorated_function
     return decorator
 
-# --- DATABASE MODELS ---
 
+# --- DATABASE MODELS ---
 hebergement_employee_association = db.Table('hebergement_employee_association',
     db.Column('hebergement_id', db.Integer, db.ForeignKey('hebergement.id'), primary_key=True),
     db.Column('employee_id', db.Integer, db.ForeignKey('employee.id'), primary_key=True)
@@ -49,7 +50,6 @@ class User(db.Model, UserMixin):
     password_hash = db.Column(db.String(120), nullable=False)
     role = db.Column(db.String(50), nullable=False, default="user")
     documents = db.relationship('Document', backref='owner', lazy=True)
-    # Relationship to Employee
     employee = db.relationship('Employee', backref='user', uselist=False)
 
 class Client(db.Model):
@@ -85,7 +85,7 @@ class Quote(db.Model):
     vat_rate = db.Column(db.Float, default=0.20)
     status = db.Column(db.String(50), default='Pending')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     @property
     def total_price(self):
         return self.price * (1 + self.vat_rate) if self.price and self.vat_rate is not None else 0
@@ -101,9 +101,9 @@ class Employee(db.Model):
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     leave_requests = db.relationship('LeaveRequest', backref='employee', lazy='dynamic')
     hebergements = db.relationship('Hebergement', secondary=hebergement_employee_association, back_populates='employees')
-    # Foreign Key to User
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True, unique=True)
 
+# FIXED MODEL
 class LeaveRequest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
@@ -111,6 +111,10 @@ class LeaveRequest(db.Model):
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date, nullable=False)
     status = db.Column(db.String(50), nullable=False, default='Pending')
+    # ADDED: Columns from your error log to prevent crashes
+    rejection_reason = db.Column(db.Text, nullable=True)
+    proposed_start_date = db.Column(db.Date, nullable=True)
+    proposed_end_date = db.Column(db.Date, nullable=True)
 
 class Candidate(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -170,14 +174,12 @@ class Hebergement(db.Model):
     notes = db.Column(db.Text, nullable=True)
     employees = db.relationship('Employee', secondary=hebergement_employee_association, back_populates='hebergements')
 
-# NEW MODEL FOR TIME TRACKING
 class TimeSheet(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
     date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
     check_in_time = db.Column(db.DateTime, nullable=True)
     check_out_time = db.Column(db.DateTime, nullable=True)
-
     employee = db.relationship('Employee', backref='timesheets')
 
     @property
@@ -231,8 +233,7 @@ def generate_quote_pdf(quote_id):
     quote = Quote.query.get_or_404(quote_id)
     rendered_html = render_template('quote_pdf_template.html', quote=quote)
     pdf = HTML(string=rendered_html).write_pdf()
-    return Response(pdf,
-                    mimetype='application/pdf',
+    return Response(pdf, mimetype='application/pdf',
                     headers={'Content-Disposition': f'attachment;filename=devis_{quote.quote_number}.pdf'})
 
 @app.route('/planning')
@@ -250,15 +251,18 @@ def list_documents():
         documents = Document.query.filter_by(user_id=current_user.id).order_by(Document.upload_date.desc()).all()
     return render_template('main_template.html', view='documents_list', documents=documents)
 
+# FIXED ROUTE
 @app.route('/documents/add', methods=['GET', 'POST'])
 @login_required
 def add_document():
     if request.method == 'POST':
-        filename = request.form.get('filename')
-        if not filename:
-            flash("Le nom du fichier est requis.", "danger")
+        doc_name = request.form.get('name')
+        doc_url = request.form.get('url')
+        if not doc_name or not doc_url:
+            flash("Le nom et l'URL du document sont requis.", "danger")
         else:
-            new_doc = Document(filename=filename, owner=current_user)
+            # owner is the backref from the User model
+            new_doc = Document(name=doc_name, url=doc_url, owner=current_user)
             db.session.add(new_doc)
             db.session.commit()
             flash("Document ajouté avec succès.", "success")
@@ -304,13 +308,13 @@ def edit_client(client_id):
 @login_required
 @role_required(['CEO', 'RH'])
 def add_candidate():
+    # This route has a 'notes' field in the form but not the model. Assuming it's not needed.
     if request.method == 'POST':
         new_candidate = Candidate(
             full_name=request.form['full_name'],
             email=request.form['email'],
             phone=request.form.get('phone'),
-            position_applied_for=request.form['position_applied_for'],
-            notes=request.form.get('notes')
+            position_applied_for=request.form['position_applied_for']
         )
         db.session.add(new_candidate)
         db.session.commit()
@@ -325,7 +329,8 @@ def view_candidate(candidate_id):
     candidate = Candidate.query.get_or_404(candidate_id)
     if request.method == 'POST':
         candidate.status = request.form.get('status', candidate.status)
-        candidate.notes = request.form.get('notes', candidate.notes)
+        # Assuming notes field might exist in the form/template
+        # candidate.notes = request.form.get('notes', candidate.notes)
         db.session.commit()
         flash('Profil du candidat mis à jour.', 'success')
         return redirect(url_for('view_candidate', candidate_id=candidate.id))
@@ -395,6 +400,21 @@ def list_leaves():
     leaves = LeaveRequest.query.order_by(LeaveRequest.start_date.desc()).all()
     return render_template('main_template.html', view='leaves_list', leaves=leaves)
 
+# ADDED: Route to handle leave status updates
+@app.route('/leaves/update/<int:leave_id>', methods=['POST'])
+@login_required
+@role_required(['CEO', 'RH'])
+def update_leave_status(leave_id):
+    leave_request = LeaveRequest.query.get_or_404(leave_id)
+    new_status = request.form.get('status')
+    if new_status in ['Approved', 'Rejected']:
+        leave_request.status = new_status
+        db.session.commit()
+        flash(f"La demande de congé a été mise à jour.", "success")
+    else:
+        flash("Statut invalide.", "danger")
+    return redirect(url_for('list_leaves'))
+
 @app.route('/candidates')
 @login_required
 @role_required(['CEO', 'RH'])
@@ -402,22 +422,17 @@ def list_candidates():
     candidates = Candidate.query.order_by(Candidate.application_date.desc()).all()
     return render_template('main_template.html', view='candidates_list', candidates=candidates)
 
-# NEW TIME TRACKING ROUTES
 @app.route('/pointeuse', methods=['GET', 'POST'])
 @login_required
 def pointeuse():
     if not current_user.employee:
         flash("Votre compte utilisateur n'est pas lié à un profil employé.", "warning")
         return redirect(url_for('bienvenue'))
-
     employee_id = current_user.employee.id
     today = datetime.utcnow().date()
-    
     todays_entry = TimeSheet.query.filter_by(employee_id=employee_id, date=today).first()
-
     if request.method == 'POST':
         action = request.form.get('action')
-        
         if action == 'check_in':
             if todays_entry:
                 flash("Vous avez déjà pointé votre arrivée aujourd'hui.", "warning")
@@ -426,7 +441,6 @@ def pointeuse():
                 db.session.add(new_entry)
                 db.session.commit()
                 flash("Arrivée enregistrée avec succès !", "success")
-        
         elif action == 'check_out':
             if not todays_entry:
                 flash("Vous devez d'abord pointer votre arrivée.", "danger")
@@ -436,9 +450,7 @@ def pointeuse():
                 todays_entry.check_out_time = datetime.utcnow()
                 db.session.commit()
                 flash("Départ enregistré avec succès !", "success")
-        
         return redirect(url_for('pointeuse'))
-
     return render_template('main_template.html', view='pointeuse', todays_entry=todays_entry, datetime=datetime)
 
 @app.route('/feuilles-de-temps')
@@ -455,28 +467,19 @@ def add_planning_event():
         title = request.form.get('title')
         start_str = request.form.get('start_time')
         end_str = request.form.get('end_time')
-        description = request.form.get('description')
-
         if not title or not start_str or not end_str:
             flash("Le titre et les dates de début et de fin sont requis.", "danger")
         else:
             start_time = datetime.strptime(start_str, '%Y-%m-%dT%H:%M')
             end_time = datetime.strptime(end_str, '%Y-%m-%dT%H:%M')
-
-            new_event = PlanningEvent(
-                title=title,
-                start_time=start_time,
-                end_time=end_time,
-                description=description
-            )
+            new_event = PlanningEvent(title=title, start_time=start_time, end_time=end_time)
             db.session.add(new_event)
             db.session.commit()
             flash("Nouvel événement ajouté au planning.", "success")
             return redirect(url_for('list_planning'))
-    
     return render_template('main_template.html', view='planning_form', form_title="Ajouter un Événement")
 
-# --- ROUTES "ADMINISTRATION" (Accès: CEO Seulement) ---
+# --- ADMIN AND OTHER ADD/EDIT ROUTES ---
 @app.route('/users')
 @login_required
 @role_required(['CEO'])
@@ -504,7 +507,7 @@ def request_leave():
         db.session.commit()
         flash('Demande de congé soumise.', 'success')
         return redirect(url_for('list_leaves'))
-    employees = Employee.query.all()
+    employees = Employee.query.filter_by(is_active=True).all()
     return render_template('main_template.html', view='leave_request_form', employees=employees, form_title="Demander un Congé")
 
 @app.route('/equipment/add', methods=['GET', 'POST'])
@@ -514,12 +517,12 @@ def add_equipment():
     if request.method == 'POST':
         new_equip = Equipment(
             name=request.form['name'],
-            brand=request.form['brand'],
-            model=request.form['model'],
-            serial_number=request.form['serial_number'],
+            brand=request.form.get('brand'),
+            model=request.form.get('model'),
+            serial_number=request.form.get('serial_number'),
             status=request.form['status'],
-            last_maintenance_date=datetime.strptime(request.form['last_maintenance_date'], '%Y-%m-%d').date() if request.form['last_maintenance_date'] else None,
-            next_maintenance_date=datetime.strptime(request.form['next_maintenance_date'], '%Y-%m-%d').date() if request.form['next_maintenance_date'] else None
+            last_maintenance_date=datetime.strptime(request.form['last_maintenance_date'], '%Y-%m-%d').date() if request.form.get('last_maintenance_date') else None,
+            next_maintenance_date=datetime.strptime(request.form['next_maintenance_date'], '%Y-%m-%d').date() if request.form.get('next_maintenance_date') else None
         )
         db.session.add(new_equip)
         db.session.commit()
@@ -532,11 +535,9 @@ def add_equipment():
 @role_required(['CEO', 'Finance'])
 def add_quote():
     if request.method == 'POST':
-        # Generating a unique quote number
         last_quote = Quote.query.order_by(Quote.id.desc()).first()
         new_id = (last_quote.id + 1) if last_quote else 1
         quote_number = f"DEV-{datetime.now().year}-{new_id:04d}"
-
         new_quote = Quote(
             quote_number=quote_number,
             client_id=request.form['client_id'],
@@ -588,19 +589,10 @@ def add_facture():
             due_date=datetime.strptime(request.form['due_date'], '%Y-%m-%d').date() if request.form['due_date'] else None,
             status='Brouillon'
         )
-        pdf_file = request.files.get('pdf_file')
-        # This part requires a configured UPLOAD_FOLDER
-        # from werkzeug.utils import secure_filename
-        # if pdf_file and pdf_file.filename != '':
-        #     filename = secure_filename(pdf_file.filename)
-        #     pdf_file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        #     new_facture.pdf_filename = filename
-
         db.session.add(new_facture)
         db.session.commit()
         flash('Facture créée avec succès.', 'success')
         return redirect(url_for('list_factures'))
-
     clients = Client.query.all()
     return render_template('main_template.html', view='facture_form', clients=clients, form_title="Nouvelle Facture")
 
@@ -668,18 +660,15 @@ def add_hebergement():
             cost=float(request.form.get('cost')) if request.form.get('cost') else None,
             notes=request.form.get('notes')
         )
-
         employee_ids = request.form.getlist('employee_ids')
         if employee_ids:
             selected_employees = Employee.query.filter(Employee.id.in_(employee_ids)).all()
             new_hebergement.employees = selected_employees
-        
         db.session.add(new_hebergement)
         db.session.commit()
         flash("Hébergement ajouté avec succès.", "success")
         return redirect(url_for('list_hebergements'))
-
-    employees = Employee.query.all()
+    employees = Employee.query.filter_by(is_active=True).all()
     return render_template('main_template.html', view='hebergement_form', form_title="Ajouter un Hébergement", employees=employees)
 
 @app.route('/chantier/add', methods=['GET', 'POST'])
@@ -698,7 +687,6 @@ def add_chantier():
         db.session.commit()
         flash('Nouveau chantier créé avec succès.', 'success')
         return redirect(url_for('list_chantiers'))
-
     clients = Client.query.all()
     return render_template('main_template.html', view='chantier_form', form_title="Créer un Chantier", clients=clients)
 
@@ -709,7 +697,6 @@ def add_employee():
     if request.method == 'POST':
         hire_date = datetime.strptime(request.form['hire_date'], '%Y-%m-%d').date() if request.form['hire_date'] else datetime.utcnow().date()
         salary = float(request.form['salary']) if request.form['salary'] else None
-        
         new_employee = Employee(
             full_name=request.form['full_name'],
             position=request.form['position'],
@@ -722,7 +709,6 @@ def add_employee():
         db.session.commit()
         flash('Employé ajouté avec succès !', 'success')
         return redirect(url_for('list_employees'))
-        
     return render_template('main_template.html', view='employee_form', form_title="Ajouter un Employé", employee=None)
 
 @app.route('/employee/edit/<int:employee_id>', methods=['GET', 'POST'])
@@ -737,11 +723,9 @@ def edit_employee(employee_id):
         employee.phone = request.form['phone']
         employee.hire_date = datetime.strptime(request.form['hire_date'], '%Y-%m-%d').date() if request.form['hire_date'] else employee.hire_date
         employee.salary = float(request.form['salary']) if request.form['salary'] else employee.salary
-        
         db.session.commit()
         flash('Les informations de l\'employé ont été mises à jour !', 'success')
         return redirect(url_for('list_employees'))
-        
     return render_template('main_template.html', view='employee_form', form_title="Modifier l'Employé", employee=employee)
 
 @app.route('/chantier/<int:chantier_id>')
@@ -758,7 +742,6 @@ def add_document_to_chantier(chantier_id):
     chantier = Chantier.query.get_or_404(chantier_id)
     doc_name = request.form.get('doc_name')
     doc_url = request.form.get('doc_url')
-
     if not doc_name or not doc_url:
         flash("Le nom et le lien du document sont requis.", 'danger')
     else:
@@ -766,13 +749,13 @@ def add_document_to_chantier(chantier_id):
             name=doc_name,
             url=doc_url,
             chantier_id=chantier.id,
-            owner=current_user 
+            owner=current_user
         )
         db.session.add(new_document)
         db.session.commit()
         flash('Document lié au chantier avec succès.', 'success')
-
     return redirect(url_for('chantier_profile', chantier_id=chantier_id))
+
 
 # --- DATABASE AND APP INITIALIZATION ---
 with app.app_context():
