@@ -52,6 +52,19 @@ class User(db.Model, UserMixin):
     # Relationship to Employee
     employee = db.relationship('Employee', backref='user', uselist=False)
 
+class LeaveRequest(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
+    leave_type = db.Column(db.String(50), nullable=False, default='Annual Leave')
+    start_date = db.Column(db.Date, nullable=False)
+    end_date = db.Column(db.Date, nullable=False)
+    status = db.Column(db.String(50), nullable=False, default='Pending')
+    
+    # AJOUTEZ CES 3 LIGNES 👇
+    rejection_reason = db.Column(db.Text, nullable=True)
+    proposed_start_date = db.Column(db.Date, nullable=True)
+    proposed_end_date = db.Column(db.Date, nullable=True)
+
 class Client(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
@@ -773,6 +786,33 @@ def add_document_to_chantier(chantier_id):
         flash('Document lié au chantier avec succès.', 'success')
 
     return redirect(url_for('chantier_profile', chantier_id=chantier_id))
+@app.route('/leaves/update/<int:leave_id>', methods=['POST'])
+@login_required
+@role_required(['CEO', 'RH'])
+def update_leave_status(leave_id):
+    leave_request = LeaveRequest.query.get_or_404(leave_id)
+    new_status = request.form.get('status')
+
+    if new_status in ['Approved', 'Rejected']:
+        leave_request.status = new_status
+        # Si la demande est rejetée, on enregistre les infos supplémentaires
+        if new_status == 'Rejected':
+            leave_request.rejection_reason = request.form.get('rejection_reason')
+            
+            start_date_str = request.form.get('proposed_start_date')
+            end_date_str = request.form.get('proposed_end_date')
+
+            if start_date_str:
+                leave_request.proposed_start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            if end_date_str:
+                leave_request.proposed_end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+
+        db.session.commit()
+        flash(f"La demande de congé a été mise à jour.", "success")
+    else:
+        flash("Action invalide.", "danger")
+
+    return redirect(url_for('list_leaves'))
 
 # --- DATABASE AND APP INITIALIZATION ---
 with app.app_context():
