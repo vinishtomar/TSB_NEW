@@ -49,9 +49,8 @@ class User(db.Model, UserMixin):
     password_hash = db.Column(db.String(120), nullable=False)
     role = db.Column(db.String(50), nullable=False, default="user")
     documents = db.relationship('Document', backref='owner', lazy=True)
-    # Relation corrigée
-    employee = db.relationship('Employee', back_populates='user', uselist=False)
-
+    # Relationship to Employee
+    employee = db.relationship('Employee', backref='user', uselist=False)
 
 class Client(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -100,16 +99,19 @@ class Employee(db.Model):
     hire_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
     salary = db.Column(db.Float, nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
-    
-    # Foreign Key vers User
-    # user_id = db.Column(db.Integer, db.ForeignKey('user.id'), unique=True, nullable=True)
-    
-    # --- CETTE SECTION EST CELLE QUI DOIT ÊTRE CORRIGÉE ---
-    # Relations corrigées
-    user = db.relationship('User', back_populates='employee')
-    leave_requests = db.relationship('LeaveRequest', back_populates='employee', lazy='dynamic')
+    leave_requests = db.relationship('LeaveRequest', backref='employee', lazy='dynamic')
     hebergements = db.relationship('Hebergement', secondary=hebergement_employee_association, back_populates='employees')
-    timesheets = db.relationship('TimeSheet', back_populates='employee')
+    # Foreign Key to User
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True, unique=True)
+
+class LeaveRequest(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
+    leave_type = db.Column(db.String(50), nullable=False, default='Annual Leave')
+    start_date = db.Column(db.Date, nullable=False)
+    end_date = db.Column(db.Date, nullable=False)
+    status = db.Column(db.String(50), nullable=False, default='Pending')
+
 class Candidate(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     full_name = db.Column(db.String(150), nullable=False)
@@ -168,21 +170,6 @@ class Hebergement(db.Model):
     notes = db.Column(db.Text, nullable=True)
     employees = db.relationship('Employee', secondary=hebergement_employee_association, back_populates='hebergements')
 
-
-class LeaveRequest(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
-    leave_type = db.Column(db.String(50), nullable=False, default='Annual Leave')
-    start_date = db.Column(db.Date, nullable=False)
-    end_date = db.Column(db.Date, nullable=False)
-    status = db.Column(db.String(50), nullable=False, default='Pending')
-    # rejection_reason = db.Column(db.Text, nullable=True)
-    proposed_start_date = db.Column(db.Date, nullable=True)
-    proposed_end_date = db.Column(db.Date, nullable=True)
-    
-    # Relation ajoutée
-    employee = db.relationship('Employee', back_populates='leave_requests')
-
 # NEW MODEL FOR TIME TRACKING
 class TimeSheet(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -191,14 +178,12 @@ class TimeSheet(db.Model):
     check_in_time = db.Column(db.DateTime, nullable=True)
     check_out_time = db.Column(db.DateTime, nullable=True)
 
-    # Relation corrigée
-    employee = db.relationship('Employee', back_populates='timesheets')
+    employee = db.relationship('Employee', backref='timesheets')
 
     @property
     def duration(self):
         if self.check_in_time and self.check_out_time:
-            delta = self.check_out_time - self.check_in_time
-            return str(delta).split('.')[0]
+            return self.check_out_time - self.check_in_time
         return None
 
 # --- AUTHENTICATION & CORE ROUTES ---
@@ -500,57 +485,28 @@ def manage_users():
     return render_template('main_template.html', view='users_list', users=users)
 
 @app.route('/leaves/request', methods=['GET', 'POST'])
-@login_required # On enlève @role_required pour que tout le monde y accède
+@login_required
+@role_required(['CEO', 'RH'])
 def request_leave():
-    # Vérifier si l'utilisateur est lié à un profil employé
-    employee_profile = Employee.query.filter_by(user_id=current_user.id).first()
-    is_rh_or_ceo = current_user.role in ['CEO', 'RH']
-
-    # Si l'utilisateur n'est pas un RH et n'a pas de profil employé, on bloque.
-    if not is_rh_or_ceo and not employee_profile:
-        flash("Votre compte n'est pas lié à un profil employé. Contactez les RH.", "warning")
-        return redirect(url_for('bienvenue')) # Redirige vers une page générale
-
     if request.method == 'POST':
-        employee_id = request.form.get('employee_id')
-
-        # Si l'utilisateur n'est pas RH, l'ID employé est forcément le sien
-        if not is_rh_or_ceo:
-            employee_id = employee_profile.id
-        
-        # ... (le reste de la fonction avec les vérifications de date reste identique) ...
-        start_date_str = request.form.get('start_date')
-        end_date_str = request.form.get('end_date')
-
-        if not start_date_str or not end_date_str:
-            flash('Les dates de début et de fin sont obligatoires.', 'danger')
-            return redirect(url_for('request_leave'))
-
-        try:
-            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-        except ValueError:
-            flash('Le format des dates est invalide.', 'danger')
-            return redirect(url_for('request_leave'))
-
+        start_date = datetime.strptime(request.form['start_date'], '%Y-%m-%d').date()
+        end_date = datetime.strptime(request.form['end_date'], '%Y-%m-%d').date()
         if start_date > end_date:
             flash('La date de début ne peut pas être après la date de fin.', 'danger')
             return redirect(url_for('request_leave'))
-        
         new_request = LeaveRequest(
-            employee_id=employee_id,
-            leave_type=request.form.get('leave_type'),
+            employee_id=request.form['employee_id'],
+            leave_type=request.form['leave_type'],
             start_date=start_date,
             end_date=end_date
         )
         db.session.add(new_request)
         db.session.commit()
         flash('Demande de congé soumise.', 'success')
-        return redirect(url_for('list_leaves') if is_rh_or_ceo else url_for('bienvenue'))
-
-    # Pour les RH, on envoie la liste de tous les employés
-    employees = Employee.query.all() if is_rh_or_ceo else []
+        return redirect(url_for('list_leaves'))
+    employees = Employee.query.all()
     return render_template('main_template.html', view='leave_request_form', employees=employees, form_title="Demander un Congé")
+
 @app.route('/equipment/add', methods=['GET', 'POST'])
 @login_required
 @role_required(['CEO', 'Chef de projet'])
@@ -817,33 +773,6 @@ def add_document_to_chantier(chantier_id):
         flash('Document lié au chantier avec succès.', 'success')
 
     return redirect(url_for('chantier_profile', chantier_id=chantier_id))
-@app.route('/leaves/update/<int:leave_id>', methods=['POST'])
-@login_required
-@role_required(['CEO', 'RH'])
-def update_leave_status(leave_id):
-    leave_request = LeaveRequest.query.get_or_404(leave_id)
-    new_status = request.form.get('status')
-
-    if new_status in ['Approved', 'Rejected']:
-        leave_request.status = new_status
-        # Si la demande est rejetée, on enregistre les infos supplémentaires
-        if new_status == 'Rejected':
-            leave_request.rejection_reason = request.form.get('rejection_reason')
-            
-            start_date_str = request.form.get('proposed_start_date')
-            end_date_str = request.form.get('proposed_end_date')
-
-            if start_date_str:
-                leave_request.proposed_start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-            if end_date_str:
-                leave_request.proposed_end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-
-        db.session.commit()
-        flash(f"La demande de congé a été mise à jour.", "success")
-    else:
-        flash("Action invalide.", "danger")
-
-    return redirect(url_for('list_leaves'))
 
 # --- DATABASE AND APP INITIALIZATION ---
 with app.app_context():
