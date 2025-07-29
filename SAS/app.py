@@ -104,6 +104,7 @@ class Employee(db.Model):
     # Foreign Key vers User
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), unique=True, nullable=True)
     
+    # --- CETTE SECTION EST CELLE QUI DOIT ÊTRE CORRIGÉE ---
     # Relations corrigées
     user = db.relationship('User', back_populates='employee')
     leave_requests = db.relationship('LeaveRequest', back_populates='employee', lazy='dynamic')
