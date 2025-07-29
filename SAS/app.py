@@ -102,7 +102,7 @@ class Employee(db.Model):
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     
     # Foreign Key vers User
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), unique=True, nullable=True)
+    # user_id = db.Column(db.Integer, db.ForeignKey('user.id'), unique=True, nullable=True)
     
     # --- CETTE SECTION EST CELLE QUI DOIT ÊTRE CORRIGÉE ---
     # Relations corrigées
@@ -176,7 +176,7 @@ class LeaveRequest(db.Model):
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date, nullable=False)
     status = db.Column(db.String(50), nullable=False, default='Pending')
-    rejection_reason = db.Column(db.Text, nullable=True)
+    # rejection_reason = db.Column(db.Text, nullable=True)
     proposed_start_date = db.Column(db.Date, nullable=True)
     proposed_end_date = db.Column(db.Date, nullable=True)
     
