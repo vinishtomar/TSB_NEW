@@ -772,29 +772,78 @@
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody>{% for leave in leaves %}<tr>
-                                        <td><strong>{{ leave.employee.full_name }}</strong></td>
-                                        <td>{{ leave.leave_type }}</td>
-                                        <td>{{ leave.start_date.strftime('%d/%m/%Y') }} - {{
-                                            leave.end_date.strftime('%d/%m/%Y') }}</td>
-                                        <td>{{ (leave.end_date - leave.start_date).days + 1 }} jours</td>
-                                        <td><span
-                                                class="badge bg-{{'success' if leave.status=='Approved' else 'warning' if leave.status=='Pending' else 'danger'}}">{{
-                                                leave.status }}</span></td>
-                                        <td>
-                                            {% if leave.status == 'Pending' %}
-                                            <form action="{{ url_for('update_leave_status', leave_id=leave.id) }}" method="POST" class="d-inline">
-                                                <button type="submit" name="status" value="Approved" class="btn btn-sm btn-success">Approuver</button>
-                                            </form>
-                                            <form action="{{ url_for('update_leave_status', leave_id=leave.id) }}" method="POST" class="d-inline">
-                                                <button type="submit" name="status" value="Rejected" class="btn btn-sm btn-danger">Rejeter</button>
-                                            </form>
-                                            {% else %}-{% endif %}
-                                        </td>
-                                    </tr>{% else %}<tr>
-                                        <td colspan="6" class="text-center text-muted">Aucune demande de congé trouvée.
-                                        </td>
-                                    </tr>{% endfor %}</tbody>
+                                <tbody>
+    {% for leave in leaves %}
+    <tr>
+        <td><strong>{{ leave.employee.full_name }}</strong></td>
+        <td>{{ leave.leave_type }}</td>
+        <td>{{ leave.start_date.strftime('%d/%m/%Y') }} - {{ leave.end_date.strftime('%d/%m/%Y') }}</td>
+        <td>{{ (leave.end_date - leave.start_date).days + 1 }} jours</td>
+        <td>
+            <span class="badge bg-{{'success' if leave.status=='Approved' else 'warning' if leave.status=='Pending' else 'danger'}}">{{ leave.status }}</span>
+        </td>
+        <td>
+            {% if leave.status == 'Pending' %}
+            <form action="{{ url_for('update_leave_status', leave_id=leave.id) }}" method="POST" class="d-inline">
+                <button type="submit" name="status" value="Approved" class="btn btn-sm btn-success">Approuver</button>
+            </form>
+            <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal-{{ leave.id }}">
+                Rejeter
+            </button>
+            {% else %}
+            -
+            {% endif %}
+        </td>
+    </tr>
+    
+    {% if leave.status == 'Rejected' and leave.rejection_reason %}
+    <tr class="table-light">
+        <td colspan="6">
+            <p class="mb-1"><strong>Motif du refus :</strong> {{ leave.rejection_reason }}</p>
+            {% if leave.proposed_start_date %}
+            <small class="text-muted"><strong>Nouvelles dates proposées :</strong> du {{ leave.proposed_start_date.strftime('%d/%m/%Y') }} au {{ leave.proposed_end_date.strftime('%d/%m/%Y') }}</small>
+            {% endif %}
+        </td>
+    </tr>
+    {% endif %}
+
+    <div class="modal fade" id="rejectModal-{{ leave.id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form action="{{ url_for('update_leave_status', leave_id=leave.id) }}" method="POST">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Refuser la demande de {{ leave.employee.full_name }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" name="status" value="Rejected">
+                        <div class="mb-3">
+                            <label for="rejection_reason-{{ leave.id }}" class="form-label">Raison du refus (Optionnel)</label>
+                            <textarea class="form-control" name="rejection_reason" id="rejection_reason-{{ leave.id }}" rows="3"></textarea>
+                        </div>
+                        <p class="form-label">Proposer de nouvelles dates (Optionnel)</p>
+                        <div class="row">
+                            <div class="col-6">
+                                <label for="proposed_start_date-{{ leave.id }}" class="form-label">Date de début</label>
+                                <input type="date" class="form-control" name="proposed_start_date" id="proposed_start_date-{{ leave.id }}">
+                            </div>
+                            <div class="col-6">
+                                <label for="proposed_end_date-{{ leave.id }}" class="form-label">Date de fin</label>
+                                <input type="date" class="form-control" name="proposed_end_date" id="proposed_end_date-{{ leave.id }}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                        <button type="submit" class="btn btn-danger">Confirmer le Refus</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    {% endfor %}
+</tbody>
                             </table>
                         </div>
                     </div>
