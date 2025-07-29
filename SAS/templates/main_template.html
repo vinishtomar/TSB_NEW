@@ -262,7 +262,7 @@
                 
                 {% elif view == 'timesheets_list' %}
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h1 class="page-title mb-0">Feuilles de Temps des Employés</h1>
+                    <h1 class="page-title mb-0">Feuilles de Temps des employées</h1>
                 </div>
                 <div class="card">
                     <div class="card-body">
@@ -270,7 +270,7 @@
                             <table class="table table-hover align-middle">
                                 <thead>
                                     <tr>
-                                        <th>Employé</th>
+                                        <th></th>
                                         <th>Date</th>
                                         <th>Heure d'arrivée</th>
                                         <th>Heure de départ</th>
@@ -280,7 +280,7 @@
                                 <tbody>
                                     {% for record in records %}
                                     <tr>
-                                        <td><strong>{{ record.employee.full_name }}</strong></td>
+                                        <td><strong>{{ record.e.full_name }}</strong></td>
                                         <td>{{ record.date.strftime('%d/%m/%Y') }}</td>
                                         <td>
                                             {% if record.check_in_time %}
@@ -317,7 +317,7 @@
 
                 {% elif view == 'hebergements_list' %}
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h1 class="page-title mb-0">Hébergements des Employés</h1>
+                    <h1 class="page-title mb-0">Hébergements des Employées</h1>
                     <a href="{{ url_for('add_hebergement') }}" class="btn btn-primary"><i
                             class="bi bi-plus-circle-fill me-2"></i>Ajouter un Hébergement</a>
                 </div>
@@ -327,7 +327,7 @@
                             <table class="table table-hover">
                                 <thead>
                                     <tr>
-                                        <th>Employé(s)</th>
+                                        <th>(s)</th>
                                         <th>Adresse</th>
                                         <th>Début</th>
                                         <th>Fin</th>
@@ -339,10 +339,10 @@
                                     {% for hebergement in hebergements %}
                                     <tr>
                                         <td>
-                                            {% for employee in hebergement.employees %}
-                                            <span class="badge bg-secondary me-1">{{ employee.full_name }}</span>
+                                            {% for e in hebergement.es %}
+                                            <span class="badge bg-secondary me-1">{{ e.full_name }}</span>
                                             {% else %}
-                                            <span class="text-muted">Aucun employé assigné</span>
+                                            <span class="text-muted">Aucun  assigné</span>
                                             {% endfor %}
                                         </td>
                                         <td>{{ hebergement.address }}</td>
