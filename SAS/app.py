@@ -468,6 +468,24 @@ def request_leave():
     employees = Employee.query.all()
     return render_template('main_template.html', view='leave_request_form', employees=employees, form_title="Demander un Congé")
 
+@app.route('/leaves/update/<int:leave_id>', methods=['POST'])
+@login_required
+@role_required(['CEO', 'RH'])
+def update_leave_status(leave_id):
+    leave_request = LeaveRequest.query.get_or_404(leave_id)
+    
+    # Get the new status from the button that was clicked ('Approved' or 'Rejected')
+    new_status = request.form.get('status')
+    
+    if new_status in ['Approved', 'Rejected']:
+        leave_request.status = new_status
+        db.session.commit()
+        flash(f"La demande de congé a été {new_status.lower()}.", "success")
+    else:
+        flash("Action invalide.", "danger")
+
+    return redirect(url_for('list_leaves'))
+
 @app.route('/equipment/add', methods=['GET', 'POST'])
 @login_required
 @role_required(['CEO', 'Chef de projet'])
