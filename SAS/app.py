@@ -78,6 +78,23 @@ class Client(db.Model):
     chantiers = db.relationship('Chantier', backref='client', lazy=True)
     factures = db.relationship('Facture', backref='client', lazy=True)
     sav_tickets = db.relationship('SavTicket', backref='client', lazy=True)
+class Employee(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    full_name = db.Column(db.String(150), nullable=False)
+    position = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=True)
+    phone = db.Column(db.String(50), nullable=True)
+    hire_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
+    salary = db.Column(db.Float, nullable=True)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    
+    # --- THIS IS THE CRITICAL FIX ---
+    # This column links an employee to a user in the 'user' table.
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True, unique=True)
+    
+    leave_requests = db.relationship('LeaveRequest', backref='employee', lazy='dynamic', cascade="all, delete-orphan")
+    hebergements = db.relationship('Hebergement', secondary=hebergement_employee_association, back_populates='employees')
+    time_sheet_entries = db.relationship('TimeSheetEntry', back_populates='employee', lazy='dynamic', cascade="all, delete-orphan")
 class Equipment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
