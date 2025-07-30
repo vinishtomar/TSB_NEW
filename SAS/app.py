@@ -121,17 +121,6 @@ class Quote(db.Model):
     @property
     def total_price(self):
         return self.price * (1 + self.vat_rate) if self.price and self.vat_rate is not None else 0
-class Employee(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    full_name = db.Column(db.String(150), nullable=False)
-    position = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=True)
-    phone = db.Column(db.String(50), nullable=True)
-    hire_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
-    salary = db.Column(db.Float, nullable=True)
-    is_active = db.Column(db.Boolean, default=True, nullable=False)
-    leave_requests = db.relationship('LeaveRequest', backref='employee', lazy='dynamic')
-    hebergements = db.relationship('Hebergement', secondary=hebergement_employee_association, back_populates='employees')
 class LeaveRequest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
