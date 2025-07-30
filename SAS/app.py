@@ -60,6 +60,10 @@ class User(db.Model, UserMixin):
     password_hash = db.Column(db.String(120), nullable=False)
     role = db.Column(db.String(50), nullable=False, default="user")
     # LIGNE À AJOUTER :
+    employee_profile = db.relationship('Employee', backref='user', uselist=False)
+
+   
+
     documents = db.relationship('Document', backref='owner', lazy=True)
 # ... etc pour tous vos modèles ...
 class Client(db.Model):
@@ -170,6 +174,25 @@ class Hebergement(db.Model):
     cost = db.Column(db.Float, nullable=True)
     notes = db.Column(db.Text, nullable=True)
     employees = db.relationship('Employee', secondary=hebergement_employee_association, back_populates='hebergements')
+class TimeSheetEntry(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
+    work_date = db.Column(db.Date, nullable=False, default=lambda: datetime.utcnow().date())
+    start_time = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    end_time = db.Column(db.DateTime, nullable=True) # Nullable because it's set on clock-out
+
+    employee = db.relationship('Employee', back_populates='time_sheet_entries')
+
+    @property
+    def duration(self):
+        """Calculates the duration of the work entry."""
+        if self.start_time and self.end_time:
+            delta = self.end_time - self.start_time
+            # Format as HH:MM:SS
+            hours, remainder = divmod(delta.total_seconds(), 3600)
+            minutes, seconds = divmod(remainder, 60)
+            return f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}"
+        return None
 
 # --- AUTHENTICATION & CORE ROUTES ---
 @login_manager.user_loader
@@ -735,6 +758,87 @@ def add_document_to_chantier(chantier_id):
         flash('Document lié au chantier avec succès.', 'success')
 
     return redirect(url_for('chantier_profile', chantier_id=chantier_id))
+from sqlalchemy import and_
+
+# Helper function to get the current employee
+def get_current_employee():
+    if current_user.is_authenticated and current_user.employee_profile:
+        return current_user.employee_profile
+    return None
+
+@app.route('/timesheet')
+@login_required
+def timesheet():
+    employee = get_current_employee()
+    if not employee:
+        flash("Votre profil utilisateur n'est pas lié à un profil employé.", "warning")
+        return redirect(url_for('dashboard')) # Or another appropriate page
+
+    today = datetime.utcnow().date()
+    
+    # Find today's entry
+    today_entry = TimeSheetEntry.query.filter(
+        TimeSheetEntry.employee_id == employee.id,
+        TimeSheetEntry.work_date == today
+    ).first()
+
+    # Get historical entries
+    history = TimeSheetEntry.query.filter(
+        TimeSheetEntry.employee_id == employee.id
+    ).order_by(TimeSheetEntry.work_date.desc()).all()
+
+    return render_template('main_template.html', view='timesheet', today_entry=today_entry, history=history)
+
+
+@app.route('/timesheet/clock-in', methods=['POST'])
+@login_required
+def clock_in():
+    employee = get_current_employee()
+    if not employee:
+        abort(403)
+
+    today = datetime.utcnow().date()
+    # Check if already clocked in today with no end time
+    existing_entry = TimeSheetEntry.query.filter(
+        TimeSheetEntry.employee_id == employee.id,
+        TimeSheetEntry.work_date == today,
+        TimeSheetEntry.end_time == None
+    ).first()
+
+    if existing_entry:
+        flash("Vous avez déjà pointé votre arrivée aujourd'hui.", "warning")
+    else:
+        new_entry = TimeSheetEntry(employee_id=employee.id)
+        db.session.add(new_entry)
+        db.session.commit()
+        flash("Arrivée enregistrée avec succès !", "success")
+        
+    return redirect(url_for('timesheet'))
+
+
+@app.route('/timesheet/clock-out', methods=['POST'])
+@login_required
+def clock_out():
+    employee = get_current_employee()
+    if not employee:
+        abort(403)
+
+    today = datetime.utcnow().date()
+    # Find the open entry for today
+    entry_to_close = TimeSheetEntry.query.filter(
+        TimeSheetEntry.employee_id == employee.id,
+        TimeSheetEntry.work_date == today,
+        TimeSheetEntry.end_time == None
+    ).first()
+
+    if entry_to_close:
+        entry_to_close.end_time = datetime.utcnow()
+        db.session.commit()
+        flash("Départ enregistré avec succès !", "success")
+    else:
+        flash("Impossible de pointer votre départ, aucune arrivée n'a été trouvée pour aujourd'hui.", "danger")
+
+    return redirect(url_for('timesheet'))
 
 # --- DATABASE AND APP INITIALIZATION ---
 # This code now runs automatically when the app starts
