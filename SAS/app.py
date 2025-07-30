@@ -6,6 +6,7 @@ from flask_login import (LoginManager, UserMixin, login_user, login_required,
                          logout_user, current_user)
 from flask_bcrypt import Bcrypt
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 
 # --- APPLICATION SETUP ---
 app = Flask(__name__)
@@ -18,11 +19,11 @@ login_manager.login_message_category = "info"
 app.secret_key = os.environ.get('SECRET_KEY', 'a_secure_random_secret_key_for_development')
 
 # --- DATABASE CONFIGURATION ---
-# Replace with your actual database URI
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql://tsb_jilz_user:WQuuirqxSdknwZjsvldYzD0DbhcOBzQ7@dpg-d0jjegmmcj7s73836lp0-a/tsb_jilz')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
 
 # --- DATABASE MODELS ---
@@ -270,8 +271,6 @@ def generate_quote_pdf(quote_id):
         flash("Error: WeasyPrint is not installed. Run 'pip install WeasyPrint'", "danger")
         return redirect(url_for('list_quotes'))
     quote = Quote.query.get_or_404(quote_id)
-    # This requires a 'quote_pdf_template.html' file not provided in the scope of this request.
-    # A placeholder message is used for rendering the PDF.
     rendered_html = f"<h1>Quote {quote.quote_number}</h1><p>Client: {quote.client.name}</p><p>Total: {quote.total_price:.2f} €</p>"
     pdf = HTML(string=rendered_html).write_pdf()
     response = make_response(pdf)
@@ -381,10 +380,8 @@ def attendance():
     today = datetime.utcnow().date()
     employees = Employee.query.filter_by(is_active=True).all()
     
-    # Get today's logs
     todays_logs = AttendanceLog.query.filter_by(work_date=today).order_by(AttendanceLog.entry_time.desc()).all()
     
-    # Check current status for each employee
     clocked_in_status = {e.id: False for e in employees}
     open_logs = AttendanceLog.query.filter_by(exit_time=None).all()
     for log in open_logs:
@@ -407,7 +404,6 @@ def clock_in():
         flash('Please select an employee.', 'danger')
         return redirect(url_for('attendance'))
 
-    # Check if already clocked in
     existing_log = AttendanceLog.query.filter_by(employee_id=employee_id, exit_time=None).first()
     if existing_log:
         flash('This employee is already clocked in.', 'warning')
@@ -427,7 +423,6 @@ def clock_out():
         flash('Please select an employee.', 'danger')
         return redirect(url_for('attendance'))
 
-    # Find the open log to close it
     log_to_close = AttendanceLog.query.filter_by(employee_id=employee_id, exit_time=None).order_by(AttendanceLog.entry_time.desc()).first()
     if log_to_close:
         log_to_close.exit_time = datetime.utcnow()
@@ -485,7 +480,7 @@ def convert_to_employee(candidate_id):
     
     employee_data = {
         'full_name': candidate.full_name, 'email': candidate.email, 'phone': candidate.phone, 'position': candidate.position_applied_for,
-        'salary': None, 'hire_date': None # Set to None to not pre-fill them
+        'salary': None, 'hire_date': None
     }
     flash('Please complete the remaining details for the new employee.', 'info')
     return render_template('main_template.html', view='employee_form', form_title="Convertir Candidat en Employé", employee=employee_data)
@@ -493,7 +488,7 @@ def convert_to_employee(candidate_id):
 
 # --- DATABASE AND APP INITIALIZATION ---
 with app.app_context():
-    db.create_all()
+    # db.create_all() is no longer needed with Flask-Migrate
     if not User.query.filter_by(username='admin').first():
         hashed_password = bcrypt.generate_password_hash('admin').decode('utf-8')
         db.session.add(User(username='admin', password_hash=hashed_password, role='admin'))
