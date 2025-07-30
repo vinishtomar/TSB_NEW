@@ -178,3 +178,12 @@
                     <div class="row"><div class="col-md-7"><div class="card"><div class="card-header">Informations sur le Candidat</div><div class="card-body"><h3>{{ candidate.full_name }}</h3><p class="text-muted">Poste: {{ candidate.position_applied_for }}</p><hr><p><strong>Email:</strong> {{ candidate.email }}</p><p><strong>Téléphone:</strong> {{ candidate.phone or 'N/A' }}</p><p><strong>Date d'application:</strong> {{ candidate.application_date.strftime('%d %B %Y') }}</p><p><strong>Notes / CV:</strong></p><pre class="bg-light p-3 rounded">{{ candidate.notes or 'Aucune note.' }}</pre></div></div></div><div class="col-md-5"><div class="card"><div class="card-header">Gérer le Statut</div><div class="card-body"><form method="POST"><div class="mb-3"><label for="status" class="form-label">Étape du recrutement</label><select class="form-select" id="status" name="status">{% set statuses = ['Applied', 'Shortlisted', 'Interview', 'Offer', 'Hired', 'Rejected'] %}{% for s in statuses %}<option value="{{ s }}" {% if candidate.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div><div class="mb-3"><label for="notes" class="form-label">Mettre à jour les notes</label><textarea class="form-control" name="notes" rows="4">{{ candidate.notes or '' }}</textarea></div><div class="d-grid gap-2"><button type="submit" class="btn btn-info">Mettre à jour</button>{% if candidate.status == 'Hired' %}<a href="{{ url_for('convert_to_employee', candidate_id=candidate.id) }}" class="btn btn-success"><i class="bi bi-arrow-right-circle-fill me-2"></i>Convertir en Employé</a>{% endif %}</div></form></div></div></div></div>
 
                 {% endif %}
+
+            </div>
+        </main>
+    </div>
+    {% endif %}
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
