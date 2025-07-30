@@ -340,6 +340,25 @@ def view_candidate(candidate_id):
 def bienvenue():
     # Cette page sert de portail pour les utilisateurs non-CEO
     return render_template('main_template.html', view='bienvenue_page')
+@app.route('/leaves/update_status/<int:leave_id>', methods=['POST'])
+@login_required
+@role_required(['CEO', 'RH'])
+def update_leave_status(leave_id):
+    # Récupérer la demande de congé depuis la base de données
+    leave = LeaveRequest.query.get_or_404(leave_id)
+    
+    # Récupérer le nouveau statut depuis le formulaire soumis
+    new_status = request.form.get('status')
+    
+    if new_status in ['Approuvé', 'Refusé']: # Validation simple
+        leave.status = new_status
+        db.session.commit()
+        flash(f'Le statut de la demande a été mis à jour : {new_status}.', 'success')
+    else:
+        flash('Statut non valide.', 'danger')
+        
+    # Rediriger l'utilisateur vers la liste des congés
+    return redirect(url_for('list_leaves'))
 
 @app.route('/client/<int:client_id>')
 @login_required
