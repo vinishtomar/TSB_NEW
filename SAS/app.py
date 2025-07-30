@@ -110,6 +110,23 @@ class Candidate(db.Model):
     status = db.Column(db.String(50), default='Applied') # Applied, Shortlisted, Interview, Offer, Hired, Rejected
     notes = db.Column(db.Text, nullable=True)
 
+class AttendanceLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
+    entry_time = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    exit_time = db.Column(db.DateTime, nullable=True)
+    work_date = db.Column(db.Date, nullable=False, default=datetime.utcnow().date)
+    
+    employee = db.relationship('Employee', backref='attendance_logs')
+
+    @property
+    def duration_hours(self):
+        if self.exit_time:
+            delta = self.exit_time - self.entry_time
+            hours = delta.total_seconds() / 3600
+            return f"{hours:.2f} hours"
+        return "Clocked In"
+
 
 # --- UTILITY FUNCTIONS ---
 def generate_alerts():
@@ -356,6 +373,71 @@ def update_leave_status(leave_id):
     db.session.commit()
     flash(f'Leave request has been {new_status.lower()}.', 'success')
     return redirect(url_for('list_leaves'))
+
+## Attendance Tracking Routes
+@app.route('/attendance')
+@login_required
+def attendance():
+    today = datetime.utcnow().date()
+    employees = Employee.query.filter_by(is_active=True).all()
+    
+    # Get today's logs
+    todays_logs = AttendanceLog.query.filter_by(work_date=today).order_by(AttendanceLog.entry_time.desc()).all()
+    
+    # Check current status for each employee
+    clocked_in_status = {e.id: False for e in employees}
+    open_logs = AttendanceLog.query.filter_by(exit_time=None).all()
+    for log in open_logs:
+        if log.employee_id in clocked_in_status:
+            clocked_in_status[log.employee_id] = True
+
+    return render_template(
+        'main_template.html', 
+        view='attendance_log', 
+        employees=employees,
+        logs=todays_logs,
+        clocked_in_status=clocked_in_status
+    )
+
+@app.route('/attendance/clock_in', methods=['POST'])
+@login_required
+def clock_in():
+    employee_id = request.form.get('employee_id')
+    if not employee_id:
+        flash('Please select an employee.', 'danger')
+        return redirect(url_for('attendance'))
+
+    # Check if already clocked in
+    existing_log = AttendanceLog.query.filter_by(employee_id=employee_id, exit_time=None).first()
+    if existing_log:
+        flash('This employee is already clocked in.', 'warning')
+    else:
+        new_log = AttendanceLog(employee_id=employee_id)
+        db.session.add(new_log)
+        db.session.commit()
+        flash('Clocked in successfully!', 'success')
+        
+    return redirect(url_for('attendance'))
+
+@app.route('/attendance/clock_out', methods=['POST'])
+@login_required
+def clock_out():
+    employee_id = request.form.get('employee_id')
+    if not employee_id:
+        flash('Please select an employee.', 'danger')
+        return redirect(url_for('attendance'))
+
+    # Find the open log to close it
+    log_to_close = AttendanceLog.query.filter_by(employee_id=employee_id, exit_time=None).order_by(AttendanceLog.entry_time.desc()).first()
+    if log_to_close:
+        log_to_close.exit_time = datetime.utcnow()
+        db.session.commit()
+        flash('Clocked out successfully!', 'success')
+    else:
+        flash('This employee was not clocked in.', 'warning')
+        
+    return redirect(url_for('attendance'))
+
 
 ## Hiring Management Routes
 @app.route('/candidates')
