@@ -10,6 +10,7 @@
         {% elif 'quote' in view %}Devis
         {% elif 'employee' in view %}Employés
         {% elif 'leave' in view %}Congés
+        {% elif 'attendance' in view %}Présences
         {% elif 'candidate' in view %}Recrutement
         {% endif %} - TSB Manager
     </title>
@@ -49,9 +50,9 @@
                     <h3 class="card-title mt-2">TSB Manager</h3>
                 </div>
                  {% with messages = get_flashed_messages(with_categories=true) %}
-                     {% if messages %}{% for category, message in messages %}
-                     <div class="alert alert-{{ category }}">{{ message }}</div>
-                     {% endfor %}{% endif %}
+                      {% if messages %}{% for category, message in messages %}
+                      <div class="alert alert-{{ category }}">{{ message }}</div>
+                      {% endfor %}{% endif %}
                  {% endwith %}
                 <form method="POST" action="{{ url_for('login') }}">
                     <div class="mb-3">
@@ -85,6 +86,7 @@
                 <a class="nav-link {% if 'quote' in view %}active{% endif %}" href="{{ url_for('list_quotes') }}"><i class="bi bi-file-earmark-text-fill"></i> Devis</a>
                 <a class="nav-link {% if 'employee' in view %}active{% endif %}" href="{{ url_for('list_employees') }}"><i class="bi bi-person-badge-fill"></i> Employés</a>
                 <a class="nav-link {% if 'leave' in view %}active{% endif %}" href="{{ url_for('list_leaves') }}"><i class="bi bi-calendar-check-fill"></i> Congés</a>
+                <a class="nav-link {% if 'attendance' in view %}active{% endif %}" href="{{ url_for('attendance') }}"><i class="bi bi-clock-history"></i> Présences</a>
                 <a class="nav-link {% if 'candidate' in view %}active{% endif %}" href="{{ url_for('list_candidates') }}"><i class="bi bi-person-plus-fill"></i> Recrutement</a>
             </nav>
             <div class="sidebar-footer">
@@ -165,6 +167,72 @@
                     <h1 class="page-title">{{ form_title }}</h1>
                     <div class="card"><div class="card-body"><form method="POST"><div class="mb-3"><label for="employee_id" class="form-label">Employé</label><select class="form-select" id="employee_id" name="employee_id" required><option value="">Sélectionner un employé...</option>{% for employee in employees %}<option value="{{ employee.id }}">{{ employee.full_name }}</option>{% endfor %}</select></div><div class="mb-3"><label for="leave_type" class="form-label">Type de Congé</label><select class="form-select" id="leave_type" name="leave_type"><option value="Annual Leave">Congé Annuel</option><option value="Sick Leave">Arrêt Maladie</option><option value="Unpaid Leave">Congé sans Solde</option><option value="Special">Congé Exceptionnel</option></select></div><div class="row"><div class="col-md-6 mb-3"><label for="start_date" class="form-label">Date de Début</label><input type="date" class="form-control" id="start_date" name="start_date" required></div><div class="col-md-6 mb-3"><label for="end_date" class="form-label">Date de Fin</label><input type="date" class="form-control" id="end_date" name="end_date" required></div></div><div class="mb-3"><label for="reason" class="form-label">Raison (Optionnel)</label><textarea class="form-control" id="reason" name="reason" rows="3"></textarea></div><button type="submit" class="btn btn-primary">Soumettre la Demande</button><a href="{{ url_for('list_leaves') }}" class="btn btn-light">Annuler</a></form></div></div>
                 
+                {% elif view == 'attendance_log' %}
+                    <h1 class="page-title mb-4">Suivi des Présences du Jour</h1>
+                    <div class="card mb-4">
+                        <div class="card-header">Action</div>
+                        <div class="card-body">
+                            <div class="row gx-3 gy-2 align-items-end">
+                                <div class="col-sm-4">
+                                    <label for="employee_id_select" class="form-label">Sélectionner l'employé</label>
+                                    <select class="form-select" id="employee_id_select" name="employee_id">
+                                        <option selected disabled>Qui êtes-vous ?</option>
+                                        {% for employee in employees %}
+                                        <option value="{{ employee.id }}">{{ employee.full_name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-sm-auto">
+                                    <form id="clock-in-form" action="{{ url_for('clock_in') }}" method="POST" class="d-inline">
+                                        <input type="hidden" name="employee_id" id="clock-in-employee-id">
+                                        <button type="submit" class="btn btn-success"><i class="bi bi-box-arrow-in-right me-2"></i>Clock In</button>
+                                    </form>
+                                </div>
+                                <div class="col-sm-auto">
+                                    <form id="clock-out-form" action="{{ url_for('clock_out') }}" method="POST" class="d-inline">
+                                        <input type="hidden" name="employee_id" id="clock-out-employee-id">
+                                        <button type="submit" class="btn btn-danger"><i class="bi bi-box-arrow-out-right me-2"></i>Clock Out</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">Journal des entrées/sorties d'aujourd'hui</div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead><tr><th>Employé</th><th>Heure d'Entrée</th><th>Heure de Sortie</th><th>Durée Totale</th></tr></thead>
+                                    <tbody>
+                                    {% for log in logs %}
+                                        <tr>
+                                            <td><strong>{{ log.employee.full_name }}</strong></td>
+                                            <td>{{ log.entry_time.strftime('%H:%M:%S') }}</td>
+                                            <td>
+                                                {% if log.exit_time %}
+                                                    {{ log.exit_time.strftime('%H:%M:%S') }}
+                                                {% else %}
+                                                    <span class="badge bg-success">En cours</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ log.duration_hours }}</td>
+                                        </tr>
+                                    {% else %}
+                                        <tr><td colspan="4" class="text-center text-muted">Aucune activité enregistrée aujourd'hui.</td></tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <script>
+                        document.getElementById('employee_id_select').addEventListener('change', function() {
+                            const selectedId = this.value;
+                            document.getElementById('clock-in-employee-id').value = selectedId;
+                            document.getElementById('clock-out-employee-id').value = selectedId;
+                        });
+                    </script>
+
                 {% elif view == 'candidates_list' %}
                     <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">Recrutement - Candidats</h1><a href="{{ url_for('add_candidate') }}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Nouveau Candidat</a></div>
                     <div class="card"><div class="card-body"><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Nom Complet</th><th>Poste Visé</th><th>Date d'Application</th><th>Statut</th><th>Actions</th></tr></thead><tbody>{% for candidate in candidates %}<tr><td><strong>{{ candidate.full_name }}</strong></td><td>{{ candidate.position_applied_for }}</td><td>{{ candidate.application_date.strftime('%d/%m/%Y') }}</td><td>{% set status_colors = {'Applied': 'primary', 'Shortlisted': 'info', 'Interview': 'secondary', 'Offer': 'warning', 'Hired': 'success', 'Rejected': 'danger'} %}<span class="badge bg-{{ status_colors.get(candidate.status, 'light') }}">{{ candidate.status }}</span></td><td><a href="{{ url_for('view_candidate', candidate_id=candidate.id) }}" class="btn btn-sm btn-outline-primary">Voir Profil</a></td></tr>{% else %}<tr><td colspan="5" class="text-center text-muted">Aucun candidat trouvé.</td></tr>{% endfor %}</tbody></table></div></div></div>
