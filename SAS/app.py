@@ -736,6 +736,27 @@ def add_document_to_chantier(chantier_id):
 
     return redirect(url_for('chantier_profile', chantier_id=chantier_id))
 
+@app.route('/leaves/update/<int:leave_id>', methods=['POST'])
+@login_required
+@role_required(['CEO', 'RH'])
+def update_leave_status(leave_id):
+    # Récupération de la demande de congé
+    leave = LeaveRequest.query.get_or_404(leave_id)
+
+    # Récupération du nouveau statut depuis le formulaire
+    new_status = request.form.get('status')
+    if new_status not in ['Approved', 'Rejected']:
+        flash('Statut invalide.', 'danger')
+        return redirect(url_for('list_leaves'))
+
+    # Mise à jour du statut
+    leave.status = new_status
+    db.session.commit()
+
+    flash(f"Le congé a été { 'approuvé' if new_status == 'Approved' else 'rejeté' }.", 'success')
+    return redirect(url_for('list_leaves'))
+
+
 # --- DATABASE AND APP INITIALIZATION ---
 # This code now runs automatically when the app starts
 with app.app_context():
