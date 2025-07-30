@@ -1,888 +1,351 @@
-import os
-from datetime import datetime, timedelta
-from flask import (Flask, render_template, request, redirect, url_for, flash,
-                   Response, session, abort, make_response)
-from flask_login import (LoginManager, UserMixin, login_user, login_required,
-                         logout_user, current_user)
-from flask_bcrypt import Bcrypt
-from flask_sqlalchemy import SQLAlchemy
-from functools import wraps
-from weasyprint import HTML
-from sqlalchemy import and_
-from werkzeug.utils import secure_filename
-
-# --- APPLICATION SETUP ---
-app = Flask(__name__)
-bcrypt = Bcrypt(app)
-login_manager = LoginManager(app)
-login_manager.login_view = "login"
-login_manager.login_message = "Veuillez vous connecter pour accéder à cette page."
-login_manager.login_message_category = "info"
-
-app.secret_key = os.environ.get('SECRET_KEY', 'a_secure_random_secret_key_for_development')
-
-# --- DATABASE CONFIGURATION ---
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql://tsb_jilz_user:WQuuirqxSdknwZjsvldYzD0DbhcOBzQ7@dpg-d0jjegmmcj7s73836lp0-a/tsb_jilz')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# --- UPLOAD FOLDER CONFIGURATION ---
-UPLOAD_FOLDER = 'uploads'
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
-
-db = SQLAlchemy(app)
-
-# --- DECORATEUR DE ROLE ---
-def role_required(roles):
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            if not current_user.is_authenticated or current_user.role not in roles:
-                abort(403) # Forbidden
-            return f(*args, **kwargs)
-        return decorated_function
-    return decorator
-
-# --- DATABASE MODELS ---
-
-hebergement_employee_association = db.Table('hebergement_employee_association',
-    db.Column('hebergement_id', db.Integer, db.ForeignKey('hebergement.id'), primary_key=True),
-    db.Column('employee_id', db.Integer, db.ForeignKey('employee.id'), primary_key=True)
-)
-
-class User(db.Model, UserMixin):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(120), nullable=False)
-    role = db.Column(db.String(50), nullable=False, default="user")
-    documents = db.relationship('Document', backref='owner', lazy=True)
-    # ADDED: Link to the employee profile
-    employee_profile = db.relationship('Employee', backref='user', uselist=False, cascade="all, delete-orphan")
-
-class Client(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), nullable=False)
-    email = db.Column(db.String(120), nullable=True)
-    phone = db.Column(db.String(50), nullable=True)
-    address = db.Column(db.String(200), nullable=True)
-    status = db.Column(db.String(50), default='Prospect')
-    last_contact_date = db.Column(db.DateTime, default=datetime.utcnow)
-    quotes = db.relationship('Quote', backref='client', lazy=True, cascade="all, delete-orphan")
-    chantiers = db.relationship('Chantier', backref='client', lazy=True)
-    factures = db.relationship('Facture', backref='client', lazy=True)
-    sav_tickets = db.relationship('SavTicket', backref='client', lazy=True)
-
-class Equipment(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), nullable=False)
-    brand = db.Column(db.String(80))
-    model = db.Column(db.String(80))
-    serial_number = db.Column(db.String(120), unique=True)
-    last_maintenance_date = db.Column(db.Date)
-    next_maintenance_date = db.Column(db.Date)
-    status = db.Column(db.String(50), default='In Service')
-
-class Quote(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    quote_number = db.Column(db.String(50), unique=True, nullable=False)
-    client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
-    service_type = db.Column(db.String(200), nullable=True)
-    details = db.Column(db.Text)
-    price = db.Column(db.Float)
-    vat_rate = db.Column(db.Float, default=0.20)
-    status = db.Column(db.String(50), default='Pending')
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    @property
-    def total_price(self):
-        return self.price * (1 + self.vat_rate) if self.price and self.vat_rate is not None else 0
-
-class Employee(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    full_name = db.Column(db.String(150), nullable=False)
-    position = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=True)
-    phone = db.Column(db.String(50), nullable=True)
-    hire_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
-    salary = db.Column(db.Float, nullable=True)
-    is_active = db.Column(db.Boolean, default=True, nullable=False)
-    # ADDED: Foreign key to User
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True, unique=True)
-    
-    leave_requests = db.relationship('LeaveRequest', backref='employee', lazy='dynamic', cascade="all, delete-orphan")
-    hebergements = db.relationship('Hebergement', secondary=hebergement_employee_association, back_populates='employees')
-    # ADDED: Relationship to TimeSheetEntry
-    time_sheet_entries = db.relationship('TimeSheetEntry', back_populates='employee', lazy='dynamic', cascade="all, delete-orphan")
-
-class LeaveRequest(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
-    leave_type = db.Column(db.String(50), nullable=False, default='Annual Leave')
-    start_date = db.Column(db.Date, nullable=False)
-    end_date = db.Column(db.Date, nullable=False)
-    status = db.Column(db.String(50), nullable=False, default='Pending') # Pending, Approved, Rejected
-
-class Candidate(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    full_name = db.Column(db.String(150), nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    phone = db.Column(db.String(50), nullable=True)
-    position_applied_for = db.Column(db.String(100), nullable=False)
-    application_date = db.Column(db.Date, default=datetime.utcnow)
-    status = db.Column(db.String(50), default='Applied') # Applied, Shortlisted, Interview, Offer, Hired, Rejected
-    notes = db.Column(db.Text)
-
-class Chantier(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), nullable=False)
-    client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
-    status = db.Column(db.String(50), default='Planifié')
-    start_date = db.Column(db.Date)
-    end_date = db.Column(db.Date)
-    documents = db.relationship('Document', backref='chantier', lazy=True, cascade="all, delete-orphan")
-
-class Facture(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    invoice_number = db.Column(db.String(50), unique=True, nullable=False)
-    client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
-    quote_id = db.Column(db.Integer, db.ForeignKey('quote.id'), nullable=True)
-    amount = db.Column(db.Float, nullable=False)
-    status = db.Column(db.String(50), default='Brouillon') # Brouillon, Envoyée, Payée, En retard
-    due_date = db.Column(db.Date)
-    pdf_filename = db.Column(db.String(300), nullable=True)
-
-class Document(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(255), nullable=False)
-    url = db.Column(db.String(500), nullable=False)
-    upload_date = db.Column(db.DateTime, default=datetime.utcnow)
-    chantier_id = db.Column(db.Integer, db.ForeignKey('chantier.id'), nullable=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-
-class SavTicket(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    ticket_number = db.Column(db.String(50), unique=True, nullable=False)
-    client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=False)
-    description = db.Column(db.Text, nullable=False)
-    status = db.Column(db.String(50), default='Ouvert')
-
-class PlanningEvent(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200), nullable=False)
-    start_time = db.Column(db.DateTime, nullable=False)
-    end_time = db.Column(db.DateTime, nullable=False)
-    description = db.Column(db.Text, nullable=True)
-
-class Hebergement(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    address = db.Column(db.String(300), nullable=False)
-    start_date = db.Column(db.Date, nullable=False)
-    end_date = db.Column(db.Date, nullable=True)
-    cost = db.Column(db.Float, nullable=True)
-    notes = db.Column(db.Text, nullable=True)
-    employees = db.relationship('Employee', secondary=hebergement_employee_association, back_populates='hebergements')
-
-# NEW MODEL FOR TIMESHEET
-class TimeSheetEntry(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    employee_id = db.Column(db.Integer, db.ForeignKey('employee.id'), nullable=False)
-    work_date = db.Column(db.Date, nullable=False, default=lambda: datetime.utcnow().date())
-    start_time = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    end_time = db.Column(db.DateTime, nullable=True)
-    employee = db.relationship('Employee', back_populates='time_sheet_entries')
-
-    @property
-    def duration(self):
-        """Calculates the duration of the work entry and returns it as H:M:S string."""
-        if self.start_time and self.end_time:
-            delta = self.end_time - self.start_time
-            hours, remainder = divmod(delta.total_seconds(), 3600)
-            minutes, seconds = divmod(remainder, 60)
-            return f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}"
-        return None
-
-# --- AUTHENTICATION & CORE ROUTES ---
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        user = User.query.filter_by(username=request.form['username']).first()
-        if user and bcrypt.check_password_hash(user.password_hash, request.form['password']):
-            login_user(user)
-            if current_user.role == 'CEO':
-                return redirect(url_for('dashboard'))
-            else:
-                return redirect(url_for('bienvenue'))
-        flash("Nom d'utilisateur ou mot de passe incorrect.", "danger")
-    return render_template('main_template.html', view='login')
-
-@app.route('/logout')
-def logout():
-    logout_user()
-    return redirect(url_for('login'))
-
-@app.route('/')
-@login_required
-@role_required(['CEO'])
-def dashboard():
-    clients = Client.query.order_by(Client.last_contact_date.desc()).limit(5).all()
-    quotes = Quote.query.filter_by(status='Pending').order_by(Quote.created_at.desc()).limit(5).all()
-    return render_template('main_template.html', view='dashboard', clients=clients, quotes=quotes)
-
-@app.route('/Bienvenue')
-@login_required
-def bienvenue():
-    return render_template('main_template.html', view='bienvenue_page')
-
-# --- EMPLOYEE SELF-SERVICE ---
-
-# Helper function to get the current employee from the logged-in user
-def get_current_employee():
-    if current_user.is_authenticated and current_user.employee_profile:
-        return current_user.employee_profile
-    return None
-
-@app.route('/timesheet')
-@login_required
-def timesheet():
-    employee = get_current_employee()
-    if not employee:
-        flash("Votre profil utilisateur n'est pas lié à un profil employé. Veuillez contacter un administrateur.", "warning")
-        return redirect(url_for('dashboard'))
-
-    today = datetime.utcnow().date()
-    
-    today_entry = TimeSheetEntry.query.filter(
-        TimeSheetEntry.employee_id == employee.id,
-        TimeSheetEntry.work_date == today
-    ).first()
-
-    history = TimeSheetEntry.query.filter(
-        TimeSheetEntry.employee_id == employee.id
-    ).order_by(TimeSheetEntry.work_date.desc()).limit(30).all()
-
-    return render_template('main_template.html', view='timesheet', today_entry=today_entry, history=history)
-
-
-@app.route('/timesheet/clock-in', methods=['POST'])
-@login_required
-def clock_in():
-    employee = get_current_employee()
-    if not employee:
-        abort(403)
-
-    today = datetime.utcnow().date()
-    existing_entry = TimeSheetEntry.query.filter(
-        and_(
-            TimeSheetEntry.employee_id == employee.id,
-            TimeSheetEntry.work_date == today,
-            TimeSheetEntry.end_time.is_(None)
-        )
-    ).first()
-
-    if existing_entry:
-        flash("Vous avez déjà pointé votre arrivée aujourd'hui.", "warning")
-    else:
-        new_entry = TimeSheetEntry(employee_id=employee.id)
-        db.session.add(new_entry)
-        db.session.commit()
-        flash("Arrivée enregistrée avec succès !", "success")
-        
-    return redirect(url_for('timesheet'))
-
-
-@app.route('/timesheet/clock-out', methods=['POST'])
-@login_required
-def clock_out():
-    employee = get_current_employee()
-    if not employee:
-        abort(403)
-
-    today = datetime.utcnow().date()
-    entry_to_close = TimeSheetEntry.query.filter(
-        and_(
-            TimeSheetEntry.employee_id == employee.id,
-            TimeSheetEntry.work_date == today,
-            TimeSheetEntry.end_time.is_(None)
-        )
-    ).first()
-
-    if entry_to_close:
-        entry_to_close.end_time = datetime.utcnow()
-        db.session.commit()
-        flash("Départ enregistré avec succès !", "success")
-    else:
-        flash("Impossible de pointer votre départ, aucune arrivée n'a été trouvée pour aujourd'hui.", "danger")
-
-    return redirect(url_for('timesheet'))
-
-# --- CRM ROUTES (Clients) ---
-
-@app.route('/clients')
-@login_required
-@role_required(['CEO', 'RH', 'Finance', 'Chef de projet'])
-def list_clients():
-    clients = Client.query.order_by(Client.name).all()
-    return render_template('main_template.html', view='clients_list', clients=clients)
-
-@app.route('/client/add', methods=['GET', 'POST'])
-@login_required
-@role_required(['CEO', 'RH', 'Finance'])
-def add_client():
-    if request.method == 'POST':
-        new_client = Client(
-            name=request.form['name'], email=request.form['email'], phone=request.form['phone'], 
-            address=request.form['address'], status=request.form['status']
-        )
-        db.session.add(new_client)
-        db.session.commit()
-        flash('Client ajouté avec succès !', 'success')
-        return redirect(url_for('list_clients'))
-    return render_template('main_template.html', view='client_form', form_title="Ajouter un Client", client=None)
-
-@app.route('/client/edit/<int:client_id>', methods=['GET', 'POST'])
-@login_required
-@role_required(['CEO', 'RH', 'Finance'])
-def edit_client(client_id):
-    client = Client.query.get_or_404(client_id)
-    if request.method == 'POST':
-        client.name = request.form['name']
-        client.email = request.form['email']
-        client.phone = request.form['phone']
-        client.address = request.form['address']
-        client.status = request.form['status']
-        client.last_contact_date = datetime.utcnow()
-        db.session.commit()
-        flash('Client mis à jour avec succès !', 'success')
-        return redirect(url_for('client_profile', client_id=client.id))
-    return render_template('main_template.html', view='client_form', form_title="Modifier le Client", client=client)
-
-@app.route('/client/<int:client_id>')
-@login_required
-@role_required(['CEO', 'RH', 'Finance', 'Chef de projet'])
-def client_profile(client_id):
-    client = Client.query.get_or_404(client_id)
-    return render_template('main_template.html', view='client_profile', client=client)
-
-# --- FINANCE ROUTES (Quotes & Factures) ---
-
-@app.route('/quotes')
-@login_required
-@role_required(['CEO', 'Finance'])
-def list_quotes():
-    quotes = Quote.query.order_by(Quote.created_at.desc()).all()
-    return render_template('main_template.html', view='quote_list', quotes=quotes)
-
-@app.route('/quote/add', methods=['GET', 'POST'])
-@login_required
-@role_required(['CEO', 'Finance'])
-def add_quote():
-    if request.method == 'POST':
-        last_quote = Quote.query.order_by(Quote.id.desc()).first()
-        new_id = (last_quote.id + 1) if last_quote else 1
-        quote_number = f"DEV-{datetime.now().year}-{new_id:04d}"
-        
-        new_quote = Quote(
-            quote_number=quote_number,
-            client_id=request.form['client_id'],
-            service_type=request.form['service_type'],
-            details=request.form['details'],
-            price=float(request.form['price']),
-            vat_rate=float(request.form['vat_rate'])
-        )
-        db.session.add(new_quote)
-        db.session.commit()
-        flash(f'Devis {quote_number} créé.', 'success')
-        return redirect(url_for('list_quotes'))
-    clients = Client.query.all()
-    return render_template('main_template.html', view='quote_form', clients=clients, form_title="Créer un Devis")
-
-@app.route('/quote/pdf/<int:quote_id>')
-@login_required
-@role_required(['CEO', 'Finance'])
-def generate_quote_pdf(quote_id):
-    quote = Quote.query.get_or_404(quote_id)
-    rendered_html = render_template('quote_pdf_template.html', quote=quote) # You still need to create this template
-    pdf = HTML(string=rendered_html).write_pdf()
-    return Response(pdf, mimetype='application/pdf', headers={'Content-Disposition': f'attachment;filename=devis_{quote.quote_number}.pdf'})
-
-@app.route('/factures')
-@login_required
-@role_required(['CEO', 'Finance'])
-def list_factures():
-    factures = Facture.query.all()
-    return render_template('main_template.html', view='factures_list', factures=factures)
-
-@app.route('/facture/add', methods=['GET', 'POST'])
-@login_required
-@role_required(['CEO', 'Finance'])
-def add_facture():
-    if request.method == 'POST':
-        last_invoice = Facture.query.order_by(Facture.id.desc()).first()
-        new_id = (last_invoice.id + 1) if last_invoice else 1
-        invoice_number = f"FACT-{datetime.now().year}-{new_id:04d}"
-        due_date_str = request.form.get('due_date')
-        
-        new_facture = Facture(
-            invoice_number=invoice_number,
-            client_id=request.form['client_id'],
-            amount=float(request.form['amount']),
-            due_date=datetime.strptime(due_date_str, '%Y-%m-%d').date() if due_date_str else None,
-            status='Brouillon'
-        )
-        
-        pdf_file = request.files.get('pdf_file')
-        if pdf_file and pdf_file.filename != '':
-            filename = secure_filename(f"{invoice_number}_{pdf_file.filename}")
-            pdf_file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            new_facture.pdf_filename = filename
-
-        db.session.add(new_facture)
-        db.session.commit()
-        flash('Facture créée avec succès.', 'success')
-        return redirect(url_for('list_factures'))
-    clients = Client.query.all()
-    return render_template('main_template.html', view='facture_form', clients=clients, form_title="Nouvelle Facture")
-
-# --- HR ROUTES (Employees, Leaves, Candidates, Hebergement) ---
-
-@app.route('/employees')
-@login_required
-@role_required(['CEO', 'RH'])
-def list_employees():
-    employees = Employee.query.order_by(Employee.full_name).all()
-    return render_template('main_template.html', view='employees_list', employees=employees)
-
-@app.route('/employee/add', methods=['GET', 'POST'])
-@login_required
-@role_required(['CEO', 'RH'])
-def add_employee():
-    if request.method == 'POST':
-        hire_date_str = request.form.get('hire_date')
-        new_employee = Employee(
-            full_name=request.form['full_name'],
-            position=request.form['position'],
-            email=request.form['email'],
-            phone=request.form.get('phone'),
-            hire_date=datetime.strptime(hire_date_str, '%Y-%m-%d').date() if hire_date_str else datetime.utcnow().date(),
-            salary=float(request.form['salary']) if request.form['salary'] else None
-        )
-        db.session.add(new_employee)
-        db.session.commit()
-        flash('Employé ajouté avec succès !', 'success')
-        return redirect(url_for('list_employees'))
-    return render_template('main_template.html', view='employee_form', form_title="Ajouter un Employé", employee=None)
-
-@app.route('/employee/edit/<int:employee_id>', methods=['GET', 'POST'])
-@login_required
-@role_required(['CEO', 'RH'])
-def edit_employee(employee_id):
-    employee = Employee.query.get_or_404(employee_id)
-    if request.method == 'POST':
-        employee.full_name = request.form['full_name']
-        employee.position = request.form['position']
-        employee.email = request.form['email']
-        employee.phone = request.form['phone']
-        hire_date_str = request.form.get('hire_date')
-        employee.hire_date = datetime.strptime(hire_date_str, '%Y-%m-%d').date() if hire_date_str else employee.hire_date
-        employee.salary = float(request.form['salary']) if request.form['salary'] else employee.salary
-        db.session.commit()
-        flash('Les informations de l\'employé ont été mises à jour !', 'success')
-        return redirect(url_for('list_employees'))
-    return render_template('main_template.html', view='employee_form', form_title="Modifier l'Employé", employee=employee)
-
-@app.route('/leaves')
-@login_required
-@role_required(['CEO', 'RH'])
-def list_leaves():
-    leaves = LeaveRequest.query.order_by(LeaveRequest.start_date.desc()).all()
-    return render_template('main_template.html', view='leaves_list', leaves=leaves)
-
-@app.route('/leaves/request', methods=['GET', 'POST'])
-@login_required
-@role_required(['CEO', 'RH'])
-def request_leave():
-    if request.method == 'POST':
-        start_date = datetime.strptime(request.form['start_date'], '%Y-%m-%d').date()
-        end_date = datetime.strptime(request.form['end_date'], '%Y-%m-%d').date()
-        if start_date > end_date:
-            flash('La date de début ne peut pas être après la date de fin.', 'danger')
-            return redirect(url_for('request_leave'))
-        new_request = LeaveRequest(
-            employee_id=request.form['employee_id'], leave_type=request.form['leave_type'],
-            start_date=start_date, end_date=end_date
-        )
-        db.session.add(new_request)
-        db.session.commit()
-        flash('Demande de congé soumise.', 'success')
-        return redirect(url_for('list_leaves'))
-    employees = Employee.query.filter_by(is_active=True).all()
-    return render_template('main_template.html', view='leave_request_form', employees=employees, form_title="Demander un Congé")
-
-@app.route('/leaves/update_status/<int:leave_id>', methods=['POST'])
-@login_required
-@role_required(['CEO', 'RH'])
-def update_leave_status(leave_id):
-    leave = LeaveRequest.query.get_or_404(leave_id)
-    new_status = request.form.get('status')
-    if new_status in ['Approved', 'Rejected']:
-        leave.status = new_status
-        db.session.commit()
-        flash(f"La demande de congé a été {new_status.lower()}.", 'success')
-    else:
-        flash("Statut invalide.", 'danger')
-    return redirect(url_for('list_leaves'))
-
-@app.route('/candidates')
-@login_required
-@role_required(['CEO', 'RH'])
-def list_candidates():
-    candidates = Candidate.query.order_by(Candidate.application_date.desc()).all()
-    return render_template('main_template.html', view='candidates_list', candidates=candidates)
-
-@app.route('/candidate/add', methods=['GET', 'POST'])
-@login_required
-@role_required(['CEO', 'RH'])
-def add_candidate():
-    if request.method == 'POST':
-        new_candidate = Candidate(
-            full_name=request.form['full_name'], email=request.form['email'],
-            phone=request.form.get('phone'), position_applied_for=request.form['position_applied_for'],
-            notes=request.form.get('notes')
-        )
-        db.session.add(new_candidate)
-        db.session.commit()
-        flash('Nouveau candidat ajouté avec succès.', 'success')
-        return redirect(url_for('list_candidates'))
-    return render_template('main_template.html', view='candidate_form', form_title="Ajouter un Candidat")
-
-@app.route('/candidate/view/<int:candidate_id>', methods=['GET', 'POST'])
-@login_required
-@role_required(['CEO', 'RH'])
-def view_candidate(candidate_id):
-    candidate = Candidate.query.get_or_404(candidate_id)
-    if request.method == 'POST':
-        candidate.status = request.form.get('status', candidate.status)
-        candidate.notes = request.form.get('notes', candidate.notes)
-        db.session.commit()
-        flash('Profil du candidat mis à jour.', 'success')
-        return redirect(url_for('view_candidate', candidate_id=candidate.id))
-    return render_template('main_template.html', view='candidate_profile', candidate=candidate)
-
-@app.route('/candidate/convert/<int:candidate_id>', methods=['POST'])
-@login_required
-@role_required(['CEO', 'RH'])
-def convert_to_employee(candidate_id):
-    candidate = Candidate.query.get_or_404(candidate_id)
-    if Employee.query.filter_by(email=candidate.email).first():
-        flash("Un employé avec cet email existe déjà.", "warning")
-        return redirect(url_for('view_candidate', candidate_id=candidate.id))
-    
-    new_employee = Employee(
-        full_name=candidate.full_name,
-        email=candidate.email,
-        phone=candidate.phone,
-        position=candidate.position_applied_for,
-        hire_date=datetime.utcnow().date()
-    )
-    db.session.add(new_employee)
-    candidate.status = "Hired"
-    db.session.commit()
-    flash(f"{candidate.full_name} a été ajouté(e) à la liste des employés.", "success")
-    return redirect(url_for('edit_employee', employee_id=new_employee.id))
-
-
-@app.route('/hebergements')
-@login_required
-@role_required(['CEO', 'RH'])
-def list_hebergements():
-    hebergements = Hebergement.query.order_by(Hebergement.start_date.desc()).all()
-    return render_template('main_template.html', view='hebergements_list', hebergements=hebergements)
-
-@app.route('/hebergement/add', methods=['GET', 'POST'])
-@login_required
-@role_required(['CEO', 'RH'])
-def add_hebergement():
-    if request.method == 'POST':
-        start_date_str = request.form.get('start_date')
-        end_date_str = request.form.get('end_date')
-        new_hebergement = Hebergement(
-            address=request.form.get('address'),
-            start_date=datetime.strptime(start_date_str, '%Y-%m-%d').date(),
-            end_date=datetime.strptime(end_date_str, '%Y-%m-%d').date() if end_date_str else None,
-            cost=float(request.form.get('cost')) if request.form.get('cost') else None,
-            notes=request.form.get('notes')
-        )
-        employee_ids = request.form.getlist('employee_ids')
-        if employee_ids:
-            selected_employees = Employee.query.filter(Employee.id.in_(employee_ids)).all()
-            new_hebergement.employees = selected_employees
-        db.session.add(new_hebergement)
-        db.session.commit()
-        flash("Hébergement ajouté avec succès.", "success")
-        return redirect(url_for('list_hebergements'))
-    employees = Employee.query.filter_by(is_active=True).all()
-    return render_template('main_template.html', view='hebergement_form', form_title="Ajouter un Hébergement", employees=employees)
-
-# --- OPERATIONS ROUTES (Chantiers, Equipment, SAV) ---
-
-@app.route('/chantiers')
-@login_required
-@role_required(['CEO', 'Chef de projet'])
-def list_chantiers():
-    chantiers = Chantier.query.all()
-    return render_template('main_template.html', view='chantiers_list', chantiers=chantiers)
-
-@app.route('/chantier/add', methods=['GET', 'POST'])
-@login_required
-@role_required(['CEO', 'Chef de projet'])
-def add_chantier():
-    if request.method == 'POST':
-        start_date_str = request.form.get('start_date')
-        end_date_str = request.form.get('end_date')
-        new_chantier = Chantier(
-            name=request.form.get('name'), client_id=request.form.get('client_id'),
-            status=request.form.get('status'),
-            start_date=datetime.strptime(start_date_str, '%Y-%m-%d').date() if start_date_str else None,
-            end_date=datetime.strptime(end_date_str, '%Y-%m-%d').date() if end_date_str else None
-        )
-        db.session.add(new_chantier)
-        db.session.commit()
-        flash('Nouveau chantier créé avec succès.', 'success')
-        return redirect(url_for('list_chantiers'))
-    clients = Client.query.all()
-    return render_template('main_template.html', view='chantier_form', form_title="Créer un Chantier", clients=clients)
-
-@app.route('/chantier/<int:chantier_id>')
-@login_required
-@role_required(['CEO', 'Chef de projet'])
-def chantier_profile(chantier_id):
-    chantier = Chantier.query.get_or_404(chantier_id)
-    return render_template('main_template.html', view='chantier_profile', chantier=chantier)
-
-@app.route('/chantier/<int:chantier_id>/add_document', methods=['POST'])
-@login_required
-@role_required(['CEO', 'Chef de projet'])
-def add_document_to_chantier(chantier_id):
-    chantier = Chantier.query.get_or_404(chantier_id)
-    doc_name = request.form.get('doc_name')
-    doc_url = request.form.get('doc_url')
-    if not doc_name or not doc_url:
-        flash("Le nom et le lien du document sont requis.", 'danger')
-    else:
-        new_document = Document(
-            name=doc_name, url=doc_url,
-            chantier_id=chantier.id, owner=current_user
-        )
-        db.session.add(new_document)
-        db.session.commit()
-        flash('Document lié au chantier avec succès.', 'success')
-    return redirect(url_for('chantier_profile', chantier_id=chantier_id))
-
-
-@app.route('/equipment')
-@login_required
-@role_required(['CEO', 'Chef de projet'])
-def list_equipment():
-    equipment_list = Equipment.query.all()
-    return render_template('main_template.html', view='equipment_list', equipment=equipment_list)
-
-@app.route('/equipment/add', methods=['GET', 'POST'])
-@login_required
-@role_required(['CEO', 'Chef de projet'])
-def add_equipment():
-    if request.method == 'POST':
-        last_maint_str = request.form.get('last_maintenance_date')
-        next_maint_str = request.form.get('next_maintenance_date')
-        new_equip = Equipment(
-            name=request.form['name'], brand=request.form['brand'],
-            model=request.form['model'], serial_number=request.form['serial_number'],
-            status=request.form['status'],
-            last_maintenance_date=datetime.strptime(last_maint_str, '%Y-%m-%d').date() if last_maint_str else None,
-            next_maintenance_date=datetime.strptime(next_maint_str, '%Y-%m-%d').date() if next_maint_str else None
-        )
-        db.session.add(new_equip)
-        db.session.commit()
-        flash('Équipement ajouté.', 'success')
-        return redirect(url_for('list_equipment'))
-    return render_template('main_template.html', view='equipment_form', form_title="Ajouter un Équipement")
-
-@app.route('/sav')
-@login_required
-@role_required(['CEO', 'Chef de projet'])
-def list_sav():
-    tickets = SavTicket.query.all()
-    return render_template('main_template.html', view='sav_list', tickets=tickets)
-
-@app.route('/sav/add', methods=['GET', 'POST'])
-@login_required
-@role_required(['CEO', 'Chef de projet'])
-def add_sav_ticket():
-    if request.method == 'POST':
-        last_ticket = SavTicket.query.order_by(SavTicket.id.desc()).first()
-        new_id = (last_ticket.id + 1) if last_ticket else 1
-        ticket_number = f"TICKET-{datetime.now().year}-{new_id:04d}"
-        new_ticket = SavTicket(
-            ticket_number=ticket_number, client_id=request.form['client_id'],
-            description=request.form['description'], status='Ouvert'
-        )
-        db.session.add(new_ticket)
-        db.session.commit()
-        flash('Ticket SAV créé.', 'success')
-        return redirect(url_for('list_sav'))
-    clients = Client.query.all()
-    return render_template('main_template.html', view='sav_form', clients=clients, form_title="Nouveau Ticket SAV")
-
-# --- GENERAL ROUTES (Documents, Planning) ---
-
-@app.route('/documents')
-@login_required
-def list_documents():
-    if current_user.role == 'CEO':
-        documents = Document.query.order_by(Document.upload_date.desc()).all()
-    else:
-        documents = Document.query.filter_by(user_id=current_user.id).order_by(Document.upload_date.desc()).all()
-    return render_template('main_template.html', view='documents_list', documents=documents)
-
-@app.route('/documents/add', methods=['GET', 'POST'])
-@login_required
-def add_document():
-    if request.method == 'POST':
-        doc_name = request.form.get('name')
-        doc_url = request.form.get('url')
-        if not doc_name or not doc_url:
-            flash("Le nom et l'URL du document sont requis.", "danger")
-        else:
-            new_doc = Document(name=doc_name, url=doc_url, owner=current_user)
-            db.session.add(new_doc)
-            db.session.commit()
-            flash("Document ajouté avec succès.", "success")
-            return redirect(url_for('list_documents'))
-    return render_template('main_template.html', view='document_form', form_title="Ajouter un Document")
-
-@app.route('/planning')
-@login_required
-def list_planning():
-    events = PlanningEvent.query.all()
-    return render_template('main_template.html', view='planning_list', events=events)
-
-@app.route('/planning/add', methods=['GET', 'POST'])
-@login_required
-def add_planning_event():
-    if request.method == 'POST':
-        title = request.form.get('title')
-        start_str = request.form.get('start_time')
-        end_str = request.form.get('end_time')
-        if not title or not start_str or not end_str:
-            flash("Le titre et les dates de début et de fin sont requis.", "danger")
-        else:
-            new_event = PlanningEvent(
-                title=title,
-                start_time=datetime.strptime(start_str, '%Y-%m-%dT%H:%M'),
-                end_time=datetime.strptime(end_str, '%Y-%m-%dT%H:%M'),
-                description=request.form.get('description')
-            )
-            db.session.add(new_event)
-            db.session.commit()
-            flash("Nouvel événement ajouté au planning.", "success")
-            return redirect(url_for('list_planning'))
-    return render_template('main_template.html', view='planning_form', form_title="Ajouter un Événement")
-
-# --- ADMINISTRATION ROUTES (CEO Only) ---
-
-@app.route('/users')
-@login_required
-@role_required(['CEO'])
-def manage_users():
-    users = User.query.all()
-    return render_template('main_template.html', view='users_list', users=users)
-
-@app.route('/users/add', methods=['POST'])
-@login_required
-@role_required(['CEO'])
-def add_user():
-    username = request.form.get('username')
-    password = request.form.get('password')
-    role = request.form.get('role')
-    if User.query.filter_by(username=username).first():
-        flash("Ce nom d'utilisateur existe déjà.", "warning")
-        return redirect(url_for('manage_users'))
-    hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
-    new_user = User(username=username, password_hash=hashed_password, role=role)
-    db.session.add(new_user)
-    db.session.commit()
-    flash("Nouvel utilisateur ajouté.", "success")
-    return redirect(url_for('manage_users'))
-
-@app.route('/user/delete/<int:user_id>', methods=['POST'])
-@login_required
-@role_required(['CEO'])
-def delete_user(user_id):
-    user_to_delete = User.query.get_or_404(user_id)
-    if user_to_delete.role == 'CEO':
-        flash("Vous ne pouvez pas supprimer le compte CEO.", "danger")
-    elif user_to_delete.id == current_user.id:
-        flash("Vous ne pouvez pas vous supprimer vous-même.", "danger")
-    else:
-        db.session.delete(user_to_delete)
-        db.session.commit()
-        flash("Utilisateur supprimé.", "success")
-    return redirect(url_for('manage_users'))
-
-@app.route('/user/edit/<int:user_id>', methods=['GET', 'POST'])
-@login_required
-@role_required(['CEO'])
-def edit_user(user_id):
-    user = User.query.get_or_404(user_id)
-    if user.role == 'CEO':
-        flash("Le rôle du CEO ne peut pas être modifié.", "warning")
-        return redirect(url_for('manage_users'))
-    if request.method == 'POST':
-        user.role = request.form.get('role')
-        db.session.commit()
-        flash("Rôle mis à jour.", "success")
-        return redirect(url_for('manage_users'))
-    return render_template('main_template.html', view='user_edit_form', user=user)
-
-# --- DATABASE AND APP INITIALIZATION ---
-def initialize_database():
-    with app.app_context():
-        print("--- Initialisation de la base de données... ---")
-        db.create_all()
-
-        default_users_data = {
-            'ceo': {'password': 'password', 'role': 'CEO', 'name': 'Jean Dupont', 'pos': 'Directeur Général'},
-            'rh': {'password': 'password', 'role': 'RH', 'name': 'Marie Curie', 'pos': 'Responsable RH'},
-            'finance': {'password': 'password', 'role': 'Finance', 'name': 'Louis Pasteur', 'pos': 'Comptable'},
-            'chef': {'password': 'password', 'role': 'Chef de projet', 'name': 'Gustave Eiffel', 'pos': 'Chef de Projet'}
-        }
-
-        for username, details in default_users_data.items():
-            user = User.query.filter_by(username=username).first()
-            if not user:
-                hashed_password = bcrypt.generate_password_hash(details['password']).decode('utf-8')
-                user = User(username=username, password_hash=hashed_password, role=details['role'])
-                db.session.add(user)
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>
+        {% if view == 'login' %}Login
+        {% elif view == 'dashboard' %}Dashboard
+        {% elif view == 'timesheet' %}Feuille de Temps
+        {% elif 'client' in view %}Clients
+        {% elif 'equipment' in view %}Équipement
+        {% elif 'quote' in view %}Devis
+        {% elif 'employee' in view %}Employés
+        {% elif 'leave' in view %}Congés
+        {% elif 'candidate' in view %}Recrutement
+        {% elif 'chantier' in view %}Chantiers
+        {% elif 'sav' in view %}SAV
+        {% elif 'facture' in view %}Factures
+        {% elif 'planning' in view %}Planning
+        {% elif 'document' in view %}Documents
+        {% else %}TSB Manager
+        {% endif %} - TSB Manager
+    </title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    {# --- VUE DE LA PAGE DE CONNEXION --- #}
+    {% if view == 'login' %}
+    <div class="login-wrapper">
+        <div class="card login-card shadow-lg">
+            <div class="card-body p-5">
+                <div class="text-center mb-4">
+                    <img src="{{ url_for('static', filename='tsb-logo.png') }}" alt="Logo" style="height: 50px;">
+                    <h3 class="card-title mt-2">TSB Manager</h3>
+                </div>
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}{% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}{% endif %}
+                {% endwith %}
+                <form method="POST" action="{{ url_for('login') }}">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Nom d'utilisateur</label>
+                        <input type="text" class="form-control" id="username" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Mot de passe</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Login</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {# --- VUE DE L'APPLICATION PRINCIPALE --- #}
+    {% else %}
+    <button id="toggle-sidebar" class="menu-toggle">
+        <i class="bi bi-list"></i>
+    </button>
+
+    <div class="page-wrapper">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <img src="{{ url_for('static', filename='tsb-logo.png') }}" alt="Logo" class="logo">
+                <span class="brand-name">TSB Manager</span>
+            </div>
+
+            <nav class="nav">
+                <div class="nav-scroll-content">
+
+                    {% if current_user.role == 'CEO' %}
+                    <a class="nav-link {% if view == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
+                        <i class="bi bi-house-door-fill"></i> Dashboard
+                    </a>
+                    {% endif %}
+
+                    {% if current_user.role in ['CEO', 'RH'] %}
+                    <div class="mt-2">
+                        <h3 class="nav-category-title">RH</h3>
+                        <a class="nav-link {% if 'client' in view %}active{% endif %}" href="{{ url_for('list_clients') }}"><i class="bi bi-person-check-fill"></i> Clients</a>
+                        <a class="nav-link {% if 'employee' in view %}active{% endif %}" href="{{ url_for('list_employees') }}"><i class="bi bi-people-fill"></i> Employés</a>
+                        <a class="nav-link {% if 'leave' in view %}active{% endif %}" href="{{ url_for('list_leaves') }}"><i class="bi bi-calendar-check-fill"></i> Congés</a>
+                        <a class="nav-link {% if 'hebergement' in view %}active{% endif %}" href="{{ url_for('list_hebergements') }}"><i class="bi bi-building"></i> Hébergement</a>
+                        <a class="nav-link {% if 'candidate' in view %}active{% endif %}" href="{{ url_for('list_candidates') }}"><i class="bi bi-person-plus-fill"></i> Recrutement</a>
+                    </div>
+                    {% endif %}
+
+                    {% if current_user.role in ['CEO', 'Chef de projet'] %}
+                    <div class="mt-2">
+                        <h3 class="nav-category-title">Opérations</h3>
+                        <a class="nav-link {% if 'chantier' in view %}active{% endif %}" href="{{ url_for('list_chantiers') }}"><i class="bi bi-wrench"></i> Chantiers</a>
+                        <a class="nav-link {% if 'equipment' in view %}active{% endif %}" href="{{ url_for('list_equipment') }}"><i class="bi bi-truck"></i> Équipement</a>
+                        <a class="nav-link {% if 'sav' in view %}active{% endif %}" href="{{ url_for('list_sav') }}"><i class="bi bi-headphones"></i> SAV</a>
+                    </div>
+                    {% endif %}
+
+                    {% if current_user.role in ['CEO', 'Finance'] %}
+                    <div class="mt-2">
+                        <h3 class="nav-category-title">Finances</h3>
+                        <a class="nav-link {% if 'quote' in view %}active{% endif %}" href="{{ url_for('list_quotes') }}"><i class="bi bi-file-earmark-text-fill"></i> Devis</a>
+                        <a class="nav-link {% if 'facture' in view %}active{% endif %}" href="{{ url_for('list_factures') }}"><i class="bi bi-credit-card"></i> Factures</a>
+                    </div>
+                    {% endif %}
+
+                    <div class="mt-2">
+                        <h3 class="nav-category-title">Autres</h3>
+                        <a class="nav-link {% if view == 'timesheet' %}active{% endif %}" href="{{ url_for('timesheet') }}">
+                            <i class="bi bi-clock-history"></i> Feuille de Temps
+                        </a>
+                        <a class="nav-link {% if 'planning' in view %}active{% endif %}" href="{{ url_for('list_planning') }}"><i class="bi bi-calendar-event"></i> Planning</a>
+                        <a class="nav-link {% if 'document' in view %}active{% endif %}" href="{{ url_for('list_documents') }}"><i class="bi bi-folder-fill"></i> Documents</a>
+
+                        {% if current_user.role == 'CEO' %}
+                        <a class="nav-link {% if 'users' in view %}active{% endif %}" href="{{ url_for('manage_users') }}"><i class="bi bi-person-gear"></i> Gestion Utilisateurs</a>
+                        {% endif %}
+                    </div>
+
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <p class="text-white text-center small mb-1">Utilisateur: {{ current_user.username }}</p>
+                <p class="text-white text-center small">Rôle: {{ current_user.role }}</p>
+                <a href="{{ url_for('logout') }}" class="btn logout-btn"><i class="bi bi-box-arrow-left"></i> Déconnexion</a>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="container-fluid">
+                {# --- General Flashed messages block --- #}
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                  {% if messages %}
+                    {% for category, message in messages %}
+                      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                      </div>
+                    {% endfor %}
+                  {% endif %}
+                {% endwith %}
+
+                {# --- PAGE CONTENT BLOCKS START HERE --- #}
+
+                {% if view == 'dashboard' %}
+                <div class="page-header-mobile-stack">
+                    <h1 class="page-title">Dashboard</h1>
+                    <p class="text-muted mb-4">Aperçu rapide de votre activité.</p>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header"><i class="bi bi-file-earmark-text-fill me-2"></i>Devis en Attente</div>
+                            <div class="card-body">
+                                <ul class="list-group list-group-flush">
+                                {% for quote in quotes %}
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <a href="{{ url_for('generate_quote_pdf', quote_id=quote.id) }}" target="_blank">#{{ quote.quote_number }}</a>
+                                        <span>{{ quote.client.name }}</span>
+                                        <span class="fw-bold">{{ "%.2f"|format(quote.total_price) }} €</span>
+                                    </li>
+                                {% else %}
+                                    <li class="list-group-item text-center text-muted">Aucun devis.</li>
+                                {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header"><i class="bi bi-people-fill me-2"></i>Clients Récents</div>
+                            <div class="card-body">
+                                <ul class="list-group list-group-flush">
+                                {% for client in clients %}
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <a href="{{ url_for('client_profile', client_id=client.id) }}">{{ client.name }}</a>
+                                        <span class="badge bg-secondary">{{ client.status }}</span>
+                                    </li>
+                                {% else %}
+                                    <li class="list-group-item text-center text-muted">Aucun client.</li>
+                                {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {% elif view == 'timesheet' %}
+                <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">Ma Feuille de Temps</h1></div>
+                <div class="row">
+                    <div class="col-lg-5 mb-4"><div class="card h-100"><div class="card-header fs-5"><i class="bi bi-calendar-day me-2"></i>Aujourd'hui</div><div class="card-body text-center d-flex flex-column justify-content-center">{% if today_entry and not today_entry.end_time %}<h5 class="card-title">Vous êtes au travail</h5><p class="card-text fs-4">Arrivée à: <strong>{{ today_entry.start_time.strftime('%H:%M:%S') }}</strong></p><form action="{{ url_for('clock_out') }}" method="POST" class="mt-3"><button type="submit" class="btn btn-danger btn-lg w-100"><i class="bi bi-box-arrow-right me-2"></i>Pointer mon Départ</button></form>{% elif today_entry and today_entry.end_time %}<h5 class="card-title">Journée Terminée</h5><p class="mb-1">Arrivée: <strong>{{ today_entry.start_time.strftime('%H:%M') }}</strong></p><p class="mb-1">Départ: <strong>{{ today_entry.end_time.strftime('%H:%M') }}</strong></p><p class="fs-4 mt-2">Total: <span class="badge bg-success">{{ today_entry.duration }}</span></p>{% else %}<h5 class="card-title">Prêt à commencer ?</h5><p class="text-muted">Vous n'avez pas encore pointé aujourd'hui.</p><form action="{{ url_for('clock_in') }}" method="POST" class="mt-3"><button type="submit" class="btn btn-primary btn-lg w-100"><i class="bi bi-box-arrow-in-left me-2"></i>Pointer mon Arrivée</button></form>{% endif %}</div></div></div>
+                    <div class="col-lg-7 mb-4"><div class="card"><div class="card-header fs-5"><i class="bi bi-list-ol me-2"></i>Historique Récent</div><div class="card-body"><div class="table-responsive" style="max-height: 400px;"><table class="table table-striped table-hover"><thead><tr><th>Date</th><th>Arrivée</th><th>Départ</th><th>Durée</th></tr></thead><tbody>{% for entry in history %}<tr><td>{{ entry.work_date.strftime('%d/%m/%Y') }}</td><td>{{ entry.start_time.strftime('%H:%M:%S') }}</td><td>{{ entry.end_time.strftime('%H:%M:%S') if entry.end_time else 'En cours...' }}</td><td>{% if entry.duration %}<span class="badge bg-secondary fw-normal">{{ entry.duration }}</span>{% else %}-{% endif %}</td></tr>{% else %}<tr><td colspan="4" class="text-center text-muted">Aucun historique.</td></tr>{% endfor %}</tbody></table></div></div></div></div>
+                </div>
+
+                {% elif view == 'clients_list' %}
+                <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">Liste des Clients</h1><a href="{{ url_for('add_client') }}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Ajouter un Client</a></div>
+                <div class="card"><div class="card-body"><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Nom</th><th>Email</th><th>Téléphone</th><th>Status</th><th>Actions</th></tr></thead><tbody>{% for client in clients %}<tr><td><strong>{{ client.name }}</strong></td><td>{{ client.email or '-' }}</td><td>{{ client.phone or '-' }}</td><td><span class="badge bg-info text-dark">{{ client.status }}</span></td><td><a href="{{ url_for('client_profile', client_id=client.id) }}" class="btn btn-sm btn-outline-primary">Voir Profil</a></td></tr>{% else %}<tr><td colspan="5" class="text-center text-muted">Aucun client trouvé.</td></tr>{% endfor %}</tbody></table></div></div></div>
+
+                {% elif view == 'client_form' %}
+                <div class="mb-4"><h1 class="page-title">{{ form_title }}</h1></div>
+                <div class="card"><div class="card-body"><form method="POST"><div class="mb-3"><label for="name" class="form-label">Nom Complet</label><input type="text" class="form-control" id="name" name="name" value="{{ client.name if client else '' }}" required></div><div class="row"><div class="col-md-6 mb-3"><label for="email" class="form-label">Email</label><input type="email" class="form-control" id="email" name="email" value="{{ client.email if client else '' }}"></div><div class="col-md-6 mb-3"><label for="phone" class="form-label">Téléphone</label><input type="tel" class="form-control" id="phone" name="phone" value="{{ client.phone if client else '' }}"></div></div><div class="mb-3"><label for="address" class="form-label">Adresse</label><textarea class="form-control" id="address" name="address" rows="3">{{ client.address if client else '' }}</textarea></div><div class="mb-3"><label for="status" class="form-label">Status</label><select class="form-select" id="status" name="status">{% set statuses = ['Prospect', 'Ongoing', 'Completed', 'Needs Follow-up'] %}{% for status in statuses %}<option value="{{ status }}" {% if client and client.status==status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></div><button type="submit" class="btn btn-primary">Enregistrer</button><a href="{{ url_for('list_clients') }}" class="btn btn-light">Annuler</a></form></div></div>
+
+                {% elif view == 'client_profile' %}
+                <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0"><i class="bi bi-person-fill me-2"></i>{{ client.name }}</h1><a href="{{ url_for('edit_client', client_id=client.id) }}" class="btn btn-secondary"><i class="bi bi-pencil-fill me-2"></i>Modifier</a></div><div class="row"><div class="col-md-4"><div class="card"><div class="card-body"><h5 class="card-title">Informations de Contact</h5><p><strong>Email:</strong> {{ client.email or 'N/A' }}</p><p><strong>Téléphone:</strong> {{ client.phone or 'N/A' }}</p><p><strong>Adresse:</strong> {{ client.address or 'N/A' }}</p><p><strong>Status:</strong> <span class="badge bg-primary">{{ client.status }}</span></p><p class="text-muted"><small>Dernier contact: {{ client.last_contact_date.strftime('%d/%m/%Y') }}</small></p></div></div></div><div class="col-md-8"><div class="card"><div class="card-header">Historique des Devis</div><ul class="list-group list-group-flush">{% for quote in client.quotes %}<li class="list-group-item d-flex justify-content-between align-items-center"><span><a href="{{ url_for('generate_quote_pdf', quote_id=quote.id) }}" target="_blank">#{{ quote.quote_number }}</a> - {{ quote.created_at.strftime('%d/%m/%Y') }}</span><span class="badge bg-{{'success' if quote.status=='Approved' else 'warning' if quote.status=='Pending' else 'danger'}}">{{ quote.status }}</span></li>{% else %}<li class="list-group-item text-muted">Aucun devis pour ce client.</li>{% endfor %}</ul></div></div></div>
+
+                {% elif view == 'factures_list' %}
+                <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">Liste des Factures</h1><a href="{{ url_for('add_facture') }}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Nouvelle Facture</a></div>
+                <div class="card"><div class="card-body"><div class="table-responsive"><table class="table table-hover"><thead><tr><th>Numéro</th><th>Client</th><th>Montant</th><th>Échéance</th><th>Statut</th><th>PDF</th></tr></thead><tbody>{% for facture in factures %}<tr><td><strong>{{ facture.invoice_number }}</strong></td><td>{{ facture.client.name }}</td><td>{{ "%.2f"|format(facture.amount) }} €</td><td>{{ facture.due_date.strftime('%d/%m/%Y') if facture.due_date else '-' }}</td><td><span class="badge bg-primary">{{ facture.status }}</span></td><td>{% if facture.pdf_filename %}<a href="{{ url_for('static', filename='uploads/' + facture.pdf_filename) }}" target="_blank" class="btn btn-sm btn-outline-danger"><i class="bi bi-file-pdf"></i></a>{% else %}-{% endif %}</td></tr>{% else %}<tr><td colspan="6" class="text-center text-muted">Aucune facture.</td></tr>{% endfor %}</tbody></table></div></div></div>
+
+                {% elif view == 'facture_form' %}
+                <div class="mb-4"><h1 class="page-title mb-0">{{ form_title }}</h1></div>
+                <div class="card"><div class="card-body"><form method="POST" enctype="multipart/form-data"><div class="mb-3"><label for="client_id" class="form-label">Client</label><select name="client_id" id="client_id" class="form-select" required><option value="">Sélectionner un client...</option>{% for client in clients %}<option value="{{ client.id }}">{{ client.name }}</option>{% endfor %}</select></div><div class="row"><div class="col-md-6 mb-3"><label for="amount" class="form-label">Montant Total TTC</label><div class="input-group"><input type="number" step="0.01" class="form-control" name="amount" id="amount" required><span class="input-group-text">€</span></div></div><div class="col-md-6 mb-3"><label for="due_date" class="form-label">Date d'échéance</label><input type="date" class="form-control" name="due_date" id="due_date"></div></div><div class="mb-3"><label for="pdf_file" class="form-label">Fichier PDF (Optionnel)</label><input class="form-control" type="file" id="pdf_file" name="pdf_file" accept=".pdf"></div><button type="submit" class="btn btn-primary">Créer la Facture</button><a href="{{ url_for('list_factures') }}" class="btn btn-light">Annuler</a></form></div></div>
+
+                {% elif view == 'sav_list' %}
+                <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">Tickets SAV</h1><a href="{{ url_for('add_sav_ticket') }}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Nouveau Ticket</a></div>
+                <div class="card"><div class="card-body"><div class="table-responsive"><table class="table table-hover"><thead><tr><th># Ticket</th><th>Client</th><th>Description</th><th>Statut</th><th>Date</th></tr></thead><tbody>{% for ticket in tickets %}<tr><td><strong>{{ ticket.ticket_number }}</strong></td><td>{{ ticket.client.name }}</td><td>{{ ticket.description|truncate(80) }}</td><td><span class="badge bg-warning">{{ ticket.status }}</span></td><td>{{ ticket.created_at.strftime('%d/%m/%Y') }}</td></tr>{% else %}<tr><td colspan="5" class="text-center text-muted">Aucun ticket SAV.</td></tr>{% endfor %}</tbody></table></div></div></div>
+
+                {% elif view == 'sav_form' %}
+                <div class="mb-4"><h1 class="page-title mb-0">{{ form_title }}</h1></div>
+                <div class="card"><div class="card-body"><form method="POST"><div class="mb-3"><label for="client_id" class="form-label">Client</label><select name="client_id" id="client_id" class="form-select" required><option value="">Sélectionner un client...</option>{% for client in clients %}<option value="{{ client.id }}">{{ client.name }}</option>{% endfor %}</select></div><div class="mb-3"><label for="description" class="form-label">Description du problème</label><textarea name="description" id="description" class="form-control" rows="4" required></textarea></div><button type="submit" class="btn btn-primary">Créer le Ticket</button><a href="{{ url_for('list_sav') }}" class="btn btn-light">Annuler</a></form></div></div>
+
+                {% elif view == 'planning_list' %}
+                <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">Planning</h1><a href="{{ url_for('add_planning_event') }}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Nouvel Événement</a></div>
+                <div class="card"><div class="card-body"><div class="list-group">{% for event in events %}<a href="#" class="list-group-item list-group-item-action"><div class="d-flex w-100 justify-content-between"><h5 class="mb-1">{{ event.title}}</h5><small>{{ event.start_time.strftime('%d/%m/%Y') }}</small></div><p class="mb-1">{{ event.description }}</p><small>De {{ event.start_time.strftime('%Hh%M') }} à {{ event.end_time.strftime('%Hh%M') }}</small></a>{% else %}<p class="text-center text-muted p-3">Aucun événement planifié.</p>{% endfor %}</div></div></div>
+
+                {% elif view == 'planning_form' %}
+                <div class="mb-4"><h1 class="page-title mb-0">{{ form_title }}</h1></div>
+                <div class="card"><div class="card-body"><form method="POST"><div class="mb-3"><label for="title" class="form-label">Titre de l'événement</label><input type="text" class="form-control" name="title" id="title" required></div><div class="row"><div class="col-md-6 mb-3"><label for="start_time" class="form-label">Date et Heure de Début</label><input type="datetime-local" class="form-control" name="start_time" id="start_time" required></div><div class="col-md-6 mb-3"><label for="end_time" class="form-label">Date et Heure de Fin</label><input type="datetime-local" class="form-control" name="end_time" id="end_time" required></div></div><div class="mb-3"><label for="description" class="form-label">Description (Optionnel)</label><textarea name="description" id="description" class="form-control" rows="3"></textarea></div><button type="submit" class="btn btn-primary">Enregistrer</button><a href="{{ url_for('list_planning') }}" class="btn btn-light">Annuler</a></form></div></div>
+
+                {% elif view == 'hebergements_list' %}
+                <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">Hébergements des Employés</h1><a href="{{ url_for('add_hebergement') }}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Ajouter un Hébergement</a></div>
+                <div class="card"><div class="card-body"><div class="table-responsive"><table class="table table-hover"><thead><tr><th>Employé(s)</th><th>Adresse</th><th>Début</th><th>Fin</th><th>Coût/Mois</th><th>Actions</th></tr></thead><tbody>{% for hebergement in hebergements %}<tr><td>{% for employee in hebergement.employees %}<span class="badge bg-secondary me-1">{{ employee.full_name }}</span>{% else %}<span class="text-muted">Aucun employé assigné</span>{% endfor %}</td><td>{{ hebergement.address }}</td><td>{{ hebergement.start_date.strftime('%d/%m/%Y') }}</td><td>{{ hebergement.end_date.strftime('%d/%m/%Y') if hebergement.end_date else '-' }}</td><td>{{ "%.2f"|format(hebergement.cost) ~ " €" if hebergement.cost else '-' }}</td><td><a href="#" class="btn btn-sm btn-outline-secondary disabled">Modifier</a></td></tr>{% else %}<tr><td colspan="6" class="text-center text-muted">Aucun hébergement enregistré.</td></tr>{% endfor %}</tbody></table></div></div></div>
+
+                {% elif view == 'hebergement_form' %}
+                <div class="mb-4"><h1 class="page-title mb-0">{{ form_title }}</h1></div>
+                <div class="card"><div class="card-body"><form method="POST"><div class="mb-3"><label for="employee_ids" class="form-label">Employé(s) concerné(s)</label><small class="form-text text-muted d-block mb-2">Maintenez la touche Ctrl (ou Cmd) pour en sélectionner plusieurs.</small><select name="employee_ids" id="employee_ids" class="form-select" multiple required>{% for employee in employees %}<option value="{{ employee.id }}">{{ employee.full_name }}</option>{% endfor %}</select></div><div class="mb-3"><label for="address" class="form-label">Adresse de l'hébergement</label><textarea name="address" id="address" class="form-control" rows="3" required></textarea></div><div class="row"><div class="col-md-4 mb-3"><label for="start_date" class="form-label">Date de début</label><input type="date" class="form-control" name="start_date" id="start_date" required></div><div class="col-md-4 mb-3"><label for="end_date" class="form-label">Date de fin (Optionnel)</label><input type="date" class="form-control" name="end_date" id="end_date"></div><div class="col-md-4 mb-3"><label for="cost" class="form-label">Coût Mensuel (Optionnel)</label><div class="input-group"><input type="number" step="0.01" class="form-control" name="cost" id="cost"><span class="input-group-text">€</span></div></div></div><div class="mb-3"><label for="notes" class="form-label">Notes (Optionnel)</label><textarea name="notes" id="notes" class="form-control" rows="2"></textarea></div><button type="submit" class="btn btn-primary">Enregistrer</button><a href="{{ url_for('list_hebergements') }}" class="btn btn-light">Annuler</a></form></div></div>
+
+                {% elif view == 'chantiers_list' %}
+                <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">Liste des Chantiers</h1><a href="{{ url_for('add_chantier') }}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Nouveau Chantier</a></div>
+                <div class="card"><div class="card-body"><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Nom</th><th>Client</th><th>Statut</th><th>Date de début</th><th>Actions</th></tr></thead><tbody>{% for chantier in chantiers %}<tr><td><strong>{{ chantier.name }}</strong></td><td>{{ chantier.client.name }}</td><td><span class="badge bg-primary">{{ chantier.status }}</span></td><td>{{ chantier.start_date.strftime('%d/%m/%Y') if chantier.start_date else '-' }}</td><td><a href="{{ url_for('chantier_profile', chantier_id=chantier.id) }}" class="btn btn-sm btn-outline-primary">Voir les Détails</a></td></tr>{% else %}<tr><td colspan="5" class="text-center text-muted">Aucun chantier trouvé.</td></tr>{% endfor %}</tbody></table></div></div></div>
+
+                {% elif view == 'chantier_form' %}
+                <div class="mb-4"><h1 class="page-title mb-0">{{ form_title }}</h1></div>
+                <div class="card"><div class="card-body"><form method="POST"><div class="mb-3"><label for="name" class="form-label">Nom du Chantier</label><input type="text" class="form-control" name="name" id="name" required></div><div class="mb-3"><label for="client_id" class="form-label">Client Associé</label><select name="client_id" id="client_id" class="form-select" required><option value="">Sélectionner un client...</option>{% for client in clients %}<option value="{{ client.id }}">{{ client.name }}</option>{% endfor %}</select></div><div class="row"><div class="col-md-4 mb-3"><label for="status" class="form-label">Statut</label><select name="status" id="status" class="form-select"><option>Planifié</option><option>En cours</option><option>Terminé</option><option>Annulé</option></select></div><div class="col-md-4 mb-3"><label for="start_date" class="form-label">Date de Début</label><input type="date" class="form-control" name="start_date" id="start_date"></div><div class="col-md-4 mb-3"><label for="end_date" class="form-label">Date de Fin</label><input type="date" class="form-control" name="end_date" id="end_date"></div></div><button type="submit" class="btn btn-primary">Enregistrer</button><a href="{{ url_for('list_chantiers') }}" class="btn btn-light">Annuler</a></form></div></div>
+
+                {% elif view == 'chantier_profile' %}
+                <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0"><i class="bi bi-wrench me-2"></i>{{ chantier.name }}</h1><a href="#" class="btn btn-secondary disabled"><i class="bi bi-pencil-fill me-2"></i>Modifier</a></div>
+                <div class="row"><div class="col-md-4"><div class="card"><div class="card-body"><h5 class="card-title">Informations</h5><p><strong>Client:</strong> {{ chantier.client.name }}</p><p><strong>Statut:</strong> <span class="badge bg-primary">{{ chantier.status }}</span></p><p><strong>Début:</strong> {{ chantier.start_date.strftime('%d/%m/%Y') if chantier.start_date else 'N/A' }}</p><p><strong>Fin:</strong> {{ chantier.end_date.strftime('%d/%m/%Y') if chantier.end_date else 'N/A' }}</p></div></div></div><div class="col-md-8"><div class="card mb-4"><div class="card-header">Documents / Liens Associés</div><ul class="list-group list-group-flush">{% for doc in chantier.documents %}<li class="list-group-item d-flex justify-content-between align-items-center"><div><i class="bi bi-link-45deg me-2"></i><a href="{{ doc.url }}" target="_blank">{{ doc.name }}</a></div><small class="text-muted">Ajouté par {{ doc.owner.username }}</small></li>{% else %}<li class="list-group-item text-muted">Aucun document lié à ce chantier.</li>{% endfor %}</ul></div><div class="card"><div class="card-body"><form action="{{ url_for('add_document_to_chantier', chantier_id=chantier.id) }}" method="POST"><h6 class="card-title">Lier un nouveau document/lien</h6><div class="row"><div class="col-md-6 mb-2"><input type="text" class="form-control" name="doc_name" placeholder="Nom du lien (ex: Plans PDF)" required></div><div class="col-md-6 mb-2"><input type="url" class="form-control" name="doc_url" placeholder="URL du lien (https://...)" required></div></div><button class="btn btn-primary w-100" type="submit">Lier</button></form></div></div></div></div>
+
+                {% elif view == 'equipment_list' %}
+                <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">Gestion de l'Équipement</h1><a href="{{ url_for('add_equipment') }}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Ajouter</a></div>
+                <div class="card"><div class="card-body"><div class="table-responsive"><table class="table table-hover"><thead><tr><th>Nom</th><th>Marque/Modèle</th><th>N° de Série</th><th>Prochaine Maintenance</th><th>Statut</th></tr></thead><tbody>{% for item in equipment %}<tr><td><strong>{{ item.name }}</strong></td><td>{{ item.brand or '' }} / {{ item.model or '' }}</td><td>{{ item.serial_number }}</td><td>{{ item.next_maintenance_date.strftime('%d/%m/%Y') if item.next_maintenance_date else '-' }}</td><td><span class="badge bg-{{'success' if item.status=='In Service' else 'danger'}}">{{ item.status }}</span></td></tr>{% else %}<tr><td colspan="5" class="text-center text-muted">Aucun équipement trouvé.</td></tr>{% endfor %}</tbody></table></div></div></div>
+
+                {% elif view == 'equipment_form' %}
+                <div class="mb-4"><h1 class="page-title">{{ form_title }}</h1></div>
+                <div class="card"><div class="card-body"><form method="POST"><div class="row"><div class="col-md-6 mb-3"><label for="name" class="form-label">Nom</label><input type="text" class="form-control" id="name" name="name" required></div><div class="col-md-6 mb-3"><label for="serial_number" class="form-label">N° de Série</label><input type="text" class="form-control" id="serial_number" name="serial_number"></div></div><div class="row"><div class="col-md-6 mb-3"><label for="brand" class="form-label">Marque</label><input type="text" class="form-control" id="brand" name="brand"></div><div class="col-md-6 mb-3"><label for="model" class="form-label">Modèle</label><input type="text" class="form-control" id="model" name="model"></div></div><div class="row"><div class="col-md-6 mb-3"><label for="last_maintenance_date" class="form-label">Dernière Maintenance</label><input type="date" class="form-control" id="last_maintenance_date" name="last_maintenance_date"></div><div class="col-md-6 mb-3"><label for="next_maintenance_date" class="form-label">Prochaine Maintenance</label><input type="date" class="form-control" id="next_maintenance_date" name="next_maintenance_date"></div></div><div class="mb-3"><label for="status" class="form-label">Statut</label><select class="form-select" id="status" name="status"><option value="In Service">In Service</option><option value="Broken">Broken</option><option value="Out of Order">Out of Order</option></select></div><button type="submit" class="btn btn-primary">Enregistrer</button></form></div></div>
+
+                {% elif view == 'quote_list' %}
+                <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">Liste des Devis</h1><a href="{{ url_for('add_quote') }}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Créer un Devis</a></div>
+                <div class="card"><div class="card-body"><div class="table-responsive"><table class="table"><thead><tr><th>Numéro</th><th>Client</th><th>Date</th><th>Total TTC</th><th>Statut</th><th>Actions</th></tr></thead><tbody>{% for quote in quotes %}<tr><td><strong>{{ quote.quote_number }}</strong></td><td>{{ quote.client.name }}</td><td>{{ quote.created_at.strftime('%d/%m/%Y') }}</td><td>{{ "%.2f"|format(quote.total_price) }} €</td><td><span class="badge bg-{{'success' if quote.status=='Approved' else 'warning' if quote.status=='Pending' else 'danger'}}">{{ quote.status }}</span></td><td><a href="{{ url_for('generate_quote_pdf', quote_id=quote.id) }}" target="_blank" class="btn btn-sm btn-outline-danger"><i class="bi bi-file-pdf-fill"></i> PDF</a></td></tr>{% else %}<tr><td colspan="6" class="text-center text-muted">Aucun devis trouvé.</td></tr>{% endfor %}</tbody></table></div></div></div>
+
+                {% elif view == 'quote_form' %}
+                <div class="mb-4"><h1 class="page-title">{{ form_title }}</h1></div>
+                <div class="card"><div class="card-body"><form method="POST"><div class="row"><div class="col-md-6 mb-3"><label for="client_id" class="form-label">Client</label><select class="form-select" id="client_id" name="client_id" required><option value="">Sélectionner un client...</option>{% for client in clients %}<option value="{{ client.id }}">{{ client.name }}</option>{% endfor %}</select></div><div class="col-md-6 mb-3"><label for="service_type" class="form-label">Type de Service</label><input type="text" class="form-control" id="service_type" name="service_type" placeholder="Ex: Réparation, Location" required></div></div><div class="mb-3"><label for="details" class="form-label">Détails des services</label><textarea class="form-control" id="details" name="details" rows="4" required></textarea></div><div class="row"><div class="col-md-6 mb-3"><label for="price" class="form-label">Prix HT</label><div class="input-group"><input type="number" step="0.01" class="form-control" id="price" name="price" required><span class="input-group-text">€</span></div></div><div class="col-md-6 mb-3"><label for="vat_rate" class="form-label">TVA</label><select class="form-select" id="vat_rate" name="vat_rate"><option value="0.20">20%</option><option value="0.10">10%</option><option value="0.055">5.5%</option><option value="0">0%</option></select></div></div><button type="submit" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Créer le devis</button></form></div></div>
+
+                {% elif view == 'employees_list' %}
+                <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">Gestion des Employés</h1><a href="{{ url_for('add_employee') }}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Ajouter un Employé</a></div>
+                <div class="card"><div class="card-body"><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Nom Complet</th><th>Poste</th><th>Email</th><th>Téléphone</th><th>Date d'Embauche</th><th>Salaire</th><th>Actions</th></tr></thead><tbody>{% for employee in employees %}<tr><td><strong>{{ employee.full_name }}</strong></td><td>{{ employee.position }}</td><td>{{ employee.email or '-' }}</td><td>{{ employee.phone or '-' }}</td><td>{{ employee.hire_date.strftime('%d/%m/%Y') }}</td><td>{% if employee.salary %}{{ "%.2f"|format(employee.salary) }} €{% else %}-{% endif %}</td><td><a href="{{ url_for('edit_employee', employee_id=employee.id) }}" class="btn btn-sm btn-outline-secondary">Modifier</a></td></tr>{% else %}<tr><td colspan="7" class="text-center text-muted">Aucun employé trouvé.</td></tr>{% endfor %}</tbody></table></div></div></div>
+
+                {% elif view == 'employee_form' %}
+                <div class="mb-4"><h1 class="page-title">{{ form_title }}</h1></div>
+                <div class="card"><div class="card-body"><form method="POST"><div class="row"><div class="col-md-6 mb-3"><label for="full_name" class="form-label">Nom Complet</label><input type="text" class="form-control" id="full_name" name="full_name" value="{{ employee.full_name if employee else '' }}" required></div><div class="col-md-6 mb-3"><label for="position" class="form-label">Poste</label><input type="text" class="form-control" id="position" name="position" value="{{ employee.position if employee else '' }}" placeholder="Ex: Technicien" required></div></div><div class="row"><div class="col-md-6 mb-3"><label for="email" class="form-label">Email</label><input type="email" class="form-control" id="email" name="email" value="{{ employee.email if employee else '' }}"></div><div class="col-md-6 mb-3"><label for="phone" class="form-label">Téléphone</label><input type="tel" class="form-control" id="phone" name="phone" value="{{ employee.phone if employee else '' }}"></div></div><div class="row"><div class="col-md-6 mb-3"><label for="hire_date" class="form-label">Date d'Embauche</label><input type="date" class="form-control" id="hire_date" name="hire_date" value="{{ employee.hire_date.strftime('%Y-%m-%d') if employee and employee.hire_date else '' }}" required></div><div class="col-md-6 mb-3"><label for="salary" class="form-label">Salaire Annuel Brut</label><div class="input-group"><input type="number" step="0.01" class="form-control" id="salary" name="salary" value="{{ employee.salary if employee else '' }}"><span class="input-group-text">€</span></div></div></div><button type="submit" class="btn btn-primary">Enregistrer</button><a href="{{ url_for('list_employees') }}" class="btn btn-light">Annuler</a></form></div></div>
+
+                {% elif view == 'leaves_list' %}
+                <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">Gestion des Congés</h1><a href="{{ url_for('request_leave') }}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Nouvelle Demande</a></div>
+                <div class="card"><div class="card-body"><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Employé</th><th>Type</th><th>Dates</th><th>Durée</th><th>Status</th><th>Actions</th></tr></thead><tbody>{% for leave in leaves %}<tr><td><strong>{{ leave.employee.full_name }}</strong></td><td>{{ leave.leave_type }}</td><td>{{ leave.start_date.strftime('%d/%m/%Y') }} - {{ leave.end_date.strftime('%d/%m/%Y') }}</td><td>{{ (leave.end_date - leave.start_date).days + 1 }} jours</td><td><span class="badge bg-{{'success' if leave.status=='Approved' else 'warning' if leave.status=='Pending' else 'danger'}}">{{ leave.status }}</span></td><td>{% if leave.status == 'Pending' %}<form action="{{ url_for('update_leave_status', leave_id=leave.id) }}" method="POST" class="d-inline"><button type="submit" name="status" value="Approved" class="btn btn-sm btn-success">Approuver</button></form><form action="{{ url_for('update_leave_status', leave_id=leave.id) }}" method="POST" class="d-inline"><button type="submit" name="status" value="Rejected" class="btn btn-sm btn-danger">Rejeter</button></form>{% else %}-{% endif %}</td></tr>{% else %}<tr><td colspan="6" class="text-center text-muted">Aucune demande de congé trouvée.</td></tr>{% endfor %}</tbody></table></div></div></div>
+
+                {% elif view == 'leave_request_form' %}
+                <div class="mb-4"><h1 class="page-title">{{ form_title }}</h1></div>
+                <div class="card"><div class="card-body"><form method="POST"><div class="mb-3"><label for="employee_id" class="form-label">Employé</label><select class="form-select" id="employee_id" name="employee_id" required><option value="">Sélectionner un employé...</option>{% for employee in employees %}<option value="{{ employee.id }}">{{ employee.full_name }}</option>{% endfor %}</select></div><div class="mb-3"><label for="leave_type" class="form-label">Type de Congé</label><select class="form-select" id="leave_type" name="leave_type"><option value="Annual Leave">Congé Annuel</option><option value="Sick Leave">Arrêt Maladie</option><option value="Unpaid Leave">Congé sans Solde</option><option value="Special">Congé Exceptionnel</option></select></div><div class="row"><div class="col-md-6 mb-3"><label for="start_date" class="form-label">Date de Début</label><input type="date" class="form-control" id="start_date" name="start_date" required></div><div class="col-md-6 mb-3"><label for="end_date" class="form-label">Date de Fin</label><input type="date" class="form-control" id="end_date" name="end_date" required></div></div><div class="mb-3"><label for="reason" class="form-label">Raison (Optionnel)</label><textarea class="form-control" id="reason" name="reason" rows="3"></textarea></div><button type="submit" class="btn btn-primary">Soumettre la Demande</button><a href="{{ url_for('list_leaves') }}" class="btn btn-light">Annuler</a></form></div></div>
+
+                {% elif view == 'candidates_list' %}
+                <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">Recrutement - Candidats</h1><a href="{{ url_for('add_candidate') }}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Nouveau Candidat</a></div>
+                <div class="card"><div class="card-body"><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Nom Complet</th><th>Poste Visé</th><th>Date d'Application</th><th>Statut</th><th>Actions</th></tr></thead><tbody>{% for candidate in candidates %}<tr><td><strong>{{ candidate.full_name }}</strong></td><td>{{ candidate.position_applied_for }}</td><td>{{ candidate.application_date.strftime('%d/%m/%Y') }}</td><td>{% set status_colors = {'Applied': 'primary', 'Shortlisted': 'info', 'Interview': 'secondary', 'Offer': 'warning', 'Hired': 'success', 'Rejected': 'danger'} %}<span class="badge bg-{{ status_colors.get(candidate.status, 'light') }}">{{ candidate.status }}</span></td><td><a href="{{ url_for('view_candidate', candidate_id=candidate.id) }}" class="btn btn-sm btn-outline-primary">Voir Profil</a></td></tr>{% else %}<tr><td colspan="5" class="text-center text-muted">Aucun candidat trouvé.</td></tr>{% endfor %}</tbody></table></div></div></div>
+
+                {% elif view == 'candidate_form' %}
+                <div class="mb-4"><h1 class="page-title">{{ form_title }}</h1></div>
+                <div class="card"><div class="card-body"><form method="POST"><div class="row"><div class="col-md-6 mb-3"><label for="full_name" class="form-label">Nom Complet</label><input type="text" class="form-control" id="full_name" name="full_name" required></div><div class="col-md-6 mb-3"><label for="position_applied_for" class="form-label">Poste Visé</label><input type="text" class="form-control" id="position_applied_for" name="position_applied_for" required></div></div><div class="row"><div class="col-md-6 mb-3"><label for="email" class="form-label">Email</label><input type="email" class="form-control" id="email" name="email" required></div><div class="col-md-6 mb-3"><label for="phone" class="form-label">Téléphone</label><input type="tel" class="form-control" id="phone" name="phone"></div></div><div class="mb-3"><label for="notes" class="form-label">Notes / CV</label><textarea class="form-control" id="notes" name="notes" rows="5" placeholder="Coller le CV ou ajouter des notes ici..."></textarea></div><button type="submit" class="btn btn-primary">Enregistrer Candidat</button><a href="{{ url_for('list_candidates') }}" class="btn btn-light">Annuler</a></form></div></div>
+
+                {% elif view == 'candidate_profile' %}
+                <div class="mb-4"><h1 class="page-title"><i class="bi bi-person-fill me-2"></i>Profil du Candidat</h1></div>
+                <div class="row"><div class="col-md-7"><div class="card"><div class="card-header">Informations sur le Candidat</div><div class="card-body"><h3>{{ candidate.full_name }}</h3><p class="text-muted">Poste: {{ candidate.position_applied_for }}</p><hr><p><strong>Email:</strong> {{ candidate.email }}</p><p><strong>Téléphone:</strong> {{ candidate.phone or 'N/A' }}</p><p><strong>Date d'application:</strong> {{ candidate.application_date.strftime('%d %B %Y') }}</p><p><strong>Notes / CV:</strong></p><pre class="bg-light p-3 rounded">{{ candidate.notes or 'Aucune note.' }}</pre></div></div></div><div class="col-md-5"><div class="card"><div class="card-header">Gérer le Statut</div><div class="card-body"><form method="POST"><div class="mb-3"><label for="status" class="form-label">Étape du recrutement</label><select class="form-select" id="status" name="status">{% set statuses = ['Applied', 'Shortlisted', 'Interview', 'Offer', 'Hired', 'Rejected'] %}{% for s in statuses %}<option value="{{ s }}" {% if candidate.status==s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div><div class="mb-3"><label for="notes" class="form-label">Mettre à jour les notes</label><textarea class="form-control" name="notes" rows="4">{{ candidate.notes or '' }}</textarea></div><div class="d-grid gap-2"><button type="submit" class="btn btn-info">Mettre à jour</button></div></form>{% if candidate.status == 'Offer' or candidate.status == 'Hired' %}<form action="{{ url_for('convert_to_employee', candidate_id=candidate.id) }}" method="POST" class="d-grid gap-2 mt-2" onsubmit="return confirm('Convertir ce candidat en employé ?')"><button type="submit" class="btn btn-success"><i class="bi bi-arrow-right-circle-fill me-2"></i>Convertir en Employé</button></form>{% endif %}</div></div></div></div>
+
+                {% elif view == 'documents_list' %}
+                <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">Gestion des Documents</h1><a href="{{ url_for('add_document') }}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-2"></i>Ajouter un document</a></div>
+                <div class="card"><div class="card-body"><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Nom du document</th><th>Propriétaire</th><th>Date d'ajout</th><th>Actions</th></tr></thead><tbody>{% for doc in documents %}<tr><td><i class="bi bi-link-45deg me-2"></i><strong><a href="{{ doc.url }}" target="_blank" rel="noopener noreferrer">{{ doc.name }}</a></strong></td><td>{{ doc.owner.username }}</td><td>{{ doc.upload_date.strftime('%d/%m/%Y') }}</td><td><a href="{{ doc.url }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary">Ouvrir</a></td></tr>{% else %}<tr><td colspan="4" class="text-center text-muted">Aucun document trouvé.</td></tr>{% endfor %}</tbody></table></div></div></div>
+
+                {% elif view == 'document_form' %}
+                <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">{{ form_title }}</h1></div>
+                <div class="card"><div class="card-body"><form method="POST"><div class="mb-3"><label for="name" class="form-label">Nom du document</label><input type="text" class="form-control" name="name" id="name" placeholder="Ex: plan_etage_1.pdf" required></div><div class="mb-3"><label for="url" class="form-label">URL du document</label><input type="url" class="form-control" name="url" id="url" placeholder="https://example.com/document.pdf" required></div><button type="submit" class="btn btn-primary">Enregistrer</button><a href="{{ url_for('list_documents') }}" class="btn btn-light">Annuler</a></form></div></div>
+
+                {% elif view == 'users_list' %}
+                <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">Gestion des Utilisateurs</h1></div>
+                <div class="card mb-4"><div class="card-header">Ajouter un nouvel utilisateur</div><div class="card-body"><form action="{{ url_for('add_user') }}" method="POST" class="row g-3 align-items-end"><div class="col-md-4"><label for="username" class="form-label">Nom d'utilisateur</label><input type="text" class="form-control" name="username" id="username" required></div><div class="col-md-4"><label for="password" class="form-label">Mot de passe</label><input type="password" class="form-control" name="password" id="password" required></div><div class="col-md-3"><label for="role" class="form-label">Rôle</label><select name="role" id="role" class="form-select" required><option value="Chef de projet">Chef de projet</option><option value="RH">RH</option><option value="Finance">Finance</option></select></div><div class="col-md-1"><button type="submit" class="btn btn-primary w-100">Ajouter</button></div></form></div></div>
+                <div class="card"><div class="card-header">Utilisateurs existants</div><div class="card-body"><div class="table-responsive"><table class="table table-hover"><thead><tr><th>Nom d'utilisateur</th><th>Rôle</th><th>Actions</th></tr></thead><tbody>{% for user in users %}<tr><td>{{ user.username }}</td><td><span class="badge bg-secondary">{{ user.role }}</span></td><td>{% if user.role != 'CEO' and user.id != current_user.id %}<a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn btn-sm btn-outline-secondary">Modifier</a><form action="{{ url_for('delete_user', user_id=user.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?');"><button type="submit" class="btn btn-sm btn-outline-danger">Supprimer</button></form>{% else %}<span class="text-muted">Non modifiable</span>{% endif %}</td></tr>{% endfor %}</tbody></table></div></div></div>
+
+                {% elif view == 'user_edit_form' %}
+                <div class="d-flex justify-content-between align-items-center mb-4"><h1 class="page-title mb-0">Modifier : {{ user.username }}</h1></div>
+                <div class="card"><div class="card-body"><form method="POST"><div class="mb-3"><label class="form-label">Nom d'utilisateur</label><input type="text" class="form-control" value="{{ user.username }}" readonly disabled></div><div class="mb-3"><label for="role" class="form-label">Rôle</label><select name="role" id="role" class="form-select" required><option value="Chef de projet" {% if user.role=='Chef de projet' %}selected{% endif %}>Chef de projet</option><option value="RH" {% if user.role=='RH' %}selected{% endif %}>RH</option><option value="Finance" {% if user.role=='Finance' %}selected{% endif %}>Finance</option></select></div><button type="submit" class="btn btn-primary">Enregistrer</button><a href="{{ url_for('manage_users') }}" class="btn btn-light">Annuler</a></form></div></div>
                 
-                # Create and link employee profile
-                employee = Employee(
-                    full_name=details['name'],
-                    position=details['pos'],
-                    email=f"{username}@tsb.com",
-                    user=user # This links the employee to the user
-                )
-                db.session.add(employee)
-        
-        db.session.commit()
-        print("--- Base de données prête. ---")
+                {% elif view == 'bienvenue_page' %}
+                <div class="page-header-mobile-stack"><h1 class="page-title">Bienvenue, {{ current_user.username }} !</h1><p class="text-muted mb-4">Accès rapide à vos sections autorisées.</p></div>
+                <div class="row">
+                    {% if current_user.role == 'RH' %}<div class="col-md-4 mb-3"><div class="card h-100"><div class="card-body text-center d-flex flex-column"><i class="bi bi-people-fill fs-1 text-primary"></i><h5 class="card-title mt-3">Ressources Humaines</h5><p class="card-text">Gérer les employés, congés et recrutements.</p></div></div></div>{% endif %}
+                    {% if current_user.role == 'Chef de projet' %}<div class="col-md-4 mb-3"><div class="card h-100"><div class="card-body text-center d-flex flex-column"><i class="bi bi-wrench fs-1 text-success"></i><h5 class="card-title mt-3">Opérations</h5><p class="card-text">Gérer les chantiers et les équipements.</p></div></div></div>{% endif %}
+                    {% if current_user.role == 'Finance' %}<div class="col-md-4 mb-3"><div class="card h-100"><div class="card-body text-center d-flex flex-column"><i class="bi bi-credit-card fs-1 text-info"></i><h5 class="card-title mt-3">Finances</h5><p class="card-text">Gérer les devis et les factures.</p></div></div></div>{% endif %}
+                </div>
 
-# This block only runs for local development
-if __name__ == '__main__':
-    initialize_database()
-    port = int(os.environ.get('PORT', 5001)) # Changed port to avoid conflicts
-    app.run(host='0.0.0.0', port=port, debug=True)
+                {% else %}
+                <div class="text-center p-5">
+                    <h1 class="display-4">Page non trouvée</h1>
+                    <p class="lead">La vue pour '{{ view }}' n'a pas été créée ou est invalide.</p>
+                    <a href="{{ url_for('dashboard') if current_user.role == 'CEO' else url_for('bienvenue') }}" class="btn btn-primary">Retour à l'accueil</a>
+                </div>
+                {% endif %}
+
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const toggleBtn = document.getElementById('toggle-sidebar');
+            const sidebar = document.querySelector('.sidebar');
+            if (toggleBtn && sidebar) {
+                toggleBtn.addEventListener('click', () => {
+                    sidebar.classList.toggle('show');
+                });
+            }
+        });
+    </script>
+    {% endif %}
+</body>
+</html>
