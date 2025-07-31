@@ -17,15 +17,15 @@ login_manager.login_message = "Veuillez vous connecter pour accéder à cette pa
 login_manager.login_message_category = "info"
 
 # It's crucial to set a secret key for session management and flashing messages.
-app.secret_key = os.environ.get('SECRET_KEY', 'a_secure_random_secret_key_for_development')
+app.secret_key = os.environ.get('SECRET_KEY', 'a_very_secure_and_random_secret_key')
 
 # --- DATABASE CONFIGURATION ---
 # The DATABASE_URL environment variable is used for production (e.g., on Render).
-# A local PostgreSQL database is used as a fallback for development.
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql://tsb_jilz_user:WQuuirqxSdknwZjsvldYzD0DbhcOBzQ7@dpg-d0jjegmmcj7s73836lp0-a/tsb_jilz')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+# Flask-Migrate is still useful for future, more complex schema changes, so we leave it initialized.
 migrate = Migrate(app, db)
 
 
@@ -135,21 +135,22 @@ class AttendanceLog(db.Model):
 # --- UTILITY FUNCTIONS ---
 def generate_alerts():
     """Checks for conditions and creates alerts. This function is destructive and regenerates all alerts."""
-    today = datetime.utcnow().date()
-    
-    Alert.query.delete()
-    
-    # Maintenance alerts
-    maintenance_due = Equipment.query.filter(Equipment.next_maintenance_date <= today + timedelta(days=30)).all()
-    for item in maintenance_due:
-        db.session.add(Alert(message=f"Maintenance for {item.name} ({item.brand})", category="Maintenance", related_id=item.id, due_date=item.next_maintenance_date))
+    with app.app_context():
+        today = datetime.utcnow().date()
+        
+        Alert.query.delete()
+        
+        # Maintenance alerts
+        maintenance_due = Equipment.query.filter(Equipment.next_maintenance_date <= today + timedelta(days=30)).all()
+        for item in maintenance_due:
+            db.session.add(Alert(message=f"Maintenance for {item.name} ({item.brand})", category="Maintenance", related_id=item.id, due_date=item.next_maintenance_date))
 
-    # Expiring quotes alerts
-    quotes_expiring = Quote.query.filter(Quote.expires_at <= datetime.utcnow() + timedelta(days=7), Quote.status == 'Pending').all()
-    for quote in quotes_expiring:
-        db.session.add(Alert(message=f"Quote #{quote.quote_number} for {quote.client.name} expires soon", category="Quote", related_id=quote.id, due_date=quote.expires_at))
+        # Expiring quotes alerts
+        quotes_expiring = Quote.query.filter(Quote.expires_at <= datetime.utcnow() + timedelta(days=7), Quote.status == 'Pending').all()
+        for quote in quotes_expiring:
+            db.session.add(Alert(message=f"Quote #{quote.quote_number} for {quote.client.name} expires soon", category="Quote", related_id=quote.id, due_date=quote.expires_at))
 
-    db.session.commit()
+        db.session.commit()
 
 
 # --- AUTHENTICATION ---
@@ -239,7 +240,9 @@ def list_equipment():
 @login_required
 def add_equipment():
     if request.method == 'POST':
-        new_equip = Equipment(name=request.form['name'], brand=request.form['brand'], model=request.form['model'], serial_number=request.form['serial_number'], status=request.form['status'], last_maintenance_date=datetime.strptime(request.form['last_maintenance_date'], '%Y-%m-%d').date() if request.form['last_maintenance_date'] else None, next_maintenance_date=datetime.strptime(request.form['next_maintenance_date'], '%Y-%m-%d').date() if request.form['next_maintenance_date'] else None)
+        last_maint_date = datetime.strptime(request.form['last_maintenance_date'], '%Y-%m-%d').date() if request.form['last_maintenance_date'] else None
+        next_maint_date = datetime.strptime(request.form['next_maintenance_date'], '%Y-%m-%d').date() if request.form['next_maintenance_date'] else None
+        new_equip = Equipment(name=request.form['name'], brand=request.form['brand'], model=request.form['model'], serial_number=request.form['serial_number'], status=request.form['status'], last_maintenance_date=last_maint_date, next_maintenance_date=next_maint_date)
         db.session.add(new_equip)
         db.session.commit()
         flash('Equipment added successfully!', 'success')
@@ -493,30 +496,25 @@ def convert_to_employee(candidate_id):
 
 
 # --- DATABASE AND APP INITIALIZATION ---
-def initialize_database():
-    """Create database tables and a default admin user if they don't exist."""
-    with app.app_context():
-        # This line creates tables if they don't exist.
-        # In a production environment with Flask-Migrate, you should remove this
-        # and instead run 'flask db upgrade' in your deployment build step.
-        db.create_all()
+# This block runs when the application starts.
+with app.app_context():
+    # This command creates all the database tables defined in your models
+    # if they don't already exist. It's a simple way to ensure the database
+    # is ready before the app starts handling requests.
+    db.create_all()
 
-        # Check if the admin user already exists.
-        if not User.query.filter_by(username='admin').first():
-            print("Creating default admin user...")
-            hashed_password = bcrypt.generate_password_hash('admin').decode('utf-8')
-            admin_user = User(username='admin', password_hash=hashed_password, role='admin')
-            db.session.add(admin_user)
-            db.session.commit()
-            print("Admin user created.")
+    # This part creates a default 'admin' user if one doesn't exist.
+    if not User.query.filter_by(username='admin').first():
+        print("Creating default admin user...")
+        hashed_password = bcrypt.generate_password_hash('admin').decode('utf-8')
+        admin_user = User(username='admin', password_hash=hashed_password, role='admin')
+        db.session.add(admin_user)
+        db.session.commit()
+        print("Admin user created with password 'admin'.")
 
+
+# This block is for local development only.
+# A production WSGI server like Gunicorn will not run this.
 if __name__ == '__main__':
-    # This block ensures that the database and tables are created before the app runs.
-    initialize_database()
-    
-    # The port is read from the environment, required by hosting platforms like Render.
     port = int(os.environ.get('PORT', 10000))
-    
-    # app.run() is used for local development.
-    # In production, a proper WSGI server like Gunicorn or uWSGI should be used.
     app.run(host='0.0.0.0', port=port, debug=True)
