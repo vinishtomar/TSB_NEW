@@ -16,9 +16,12 @@ login_manager.login_view = "login"
 login_manager.login_message = "Veuillez vous connecter pour accéder à cette page."
 login_manager.login_message_category = "info"
 
+# It's crucial to set a secret key for session management and flashing messages.
 app.secret_key = os.environ.get('SECRET_KEY', 'a_secure_random_secret_key_for_development')
 
 # --- DATABASE CONFIGURATION ---
+# The DATABASE_URL environment variable is used for production (e.g., on Render).
+# A local PostgreSQL database is used as a fallback for development.
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql://tsb_jilz_user:WQuuirqxSdknwZjsvldYzD0DbhcOBzQ7@dpg-d0jjegmmcj7s73836lp0-a/tsb_jilz')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -29,6 +32,7 @@ migrate = Migrate(app, db)
 # --- DATABASE MODELS ---
 
 class User(db.Model, UserMixin):
+    __tablename__ = 'user_account' # Explicitly name table to avoid conflicts with 'user' keyword in some DBs
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(120), nullable=False)
@@ -75,7 +79,7 @@ class Quote(db.Model):
 class Alert(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     message = db.Column(db.String(255), nullable=False)
-    category = db.Column(db.String(50), nullable=False) # Maintenance, Quote, Client
+    category = db.Column(db.String(50), nullable=False) # e.g., Maintenance, Quote, Client
     related_id = db.Column(db.Integer)
     due_date = db.Column(db.DateTime)
     is_dismissed = db.Column(db.Boolean, default=False)
@@ -98,9 +102,9 @@ class LeaveRequest(db.Model):
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date, nullable=False)
     reason = db.Column(db.Text, nullable=True)
-    status = db.Column(db.String(50), nullable=False, default='Pending') # Pending, Approved, Rejected
+    status = db.Column(db.String(50), nullable=False, default='Pending') # e.g., Pending, Approved, Rejected
     requested_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
 class Candidate(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     full_name = db.Column(db.String(150), nullable=False)
@@ -108,7 +112,7 @@ class Candidate(db.Model):
     phone = db.Column(db.String(50), nullable=True)
     position_applied_for = db.Column(db.String(100), nullable=False)
     application_date = db.Column(db.Date, default=datetime.utcnow)
-    status = db.Column(db.String(50), default='Applied') # Applied, Shortlisted, Interview, Offer, Hired, Rejected
+    status = db.Column(db.String(50), default='Applied') # e.g., Applied, Shortlisted, Interview, Offer, Hired, Rejected
     notes = db.Column(db.Text, nullable=True)
 
 class AttendanceLog(db.Model):
@@ -117,7 +121,6 @@ class AttendanceLog(db.Model):
     entry_time = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     exit_time = db.Column(db.DateTime, nullable=True)
     work_date = db.Column(db.Date, nullable=False, default=datetime.utcnow().date)
-    
     employee = db.relationship('Employee', backref='attendance_logs')
 
     @property
@@ -131,14 +134,17 @@ class AttendanceLog(db.Model):
 
 # --- UTILITY FUNCTIONS ---
 def generate_alerts():
-    """Checks for conditions and creates alerts."""
+    """Checks for conditions and creates alerts. This function is destructive and regenerates all alerts."""
     today = datetime.utcnow().date()
-    Alert.query.delete() 
     
+    Alert.query.delete()
+    
+    # Maintenance alerts
     maintenance_due = Equipment.query.filter(Equipment.next_maintenance_date <= today + timedelta(days=30)).all()
     for item in maintenance_due:
         db.session.add(Alert(message=f"Maintenance for {item.name} ({item.brand})", category="Maintenance", related_id=item.id, due_date=item.next_maintenance_date))
 
+    # Expiring quotes alerts
     quotes_expiring = Quote.query.filter(Quote.expires_at <= datetime.utcnow() + timedelta(days=7), Quote.status == 'Pending').all()
     for quote in quotes_expiring:
         db.session.add(Alert(message=f"Quote #{quote.quote_number} for {quote.client.name} expires soon", category="Quote", related_id=quote.id, due_date=quote.expires_at))
@@ -487,13 +493,30 @@ def convert_to_employee(candidate_id):
 
 
 # --- DATABASE AND APP INITIALIZATION ---
-with app.app_context():
-    # db.create_all() is no longer needed with Flask-Migrate
-    if not User.query.filter_by(username='admin').first():
-        hashed_password = bcrypt.generate_password_hash('admin').decode('utf-8')
-        db.session.add(User(username='admin', password_hash=hashed_password, role='admin'))
-        db.session.commit()
+def initialize_database():
+    """Create database tables and a default admin user if they don't exist."""
+    with app.app_context():
+        # This line creates tables if they don't exist.
+        # In a production environment with Flask-Migrate, you should remove this
+        # and instead run 'flask db upgrade' in your deployment build step.
+        db.create_all()
+
+        # Check if the admin user already exists.
+        if not User.query.filter_by(username='admin').first():
+            print("Creating default admin user...")
+            hashed_password = bcrypt.generate_password_hash('admin').decode('utf-8')
+            admin_user = User(username='admin', password_hash=hashed_password, role='admin')
+            db.session.add(admin_user)
+            db.session.commit()
+            print("Admin user created.")
 
 if __name__ == '__main__':
+    # This block ensures that the database and tables are created before the app runs.
+    initialize_database()
+    
+    # The port is read from the environment, required by hosting platforms like Render.
     port = int(os.environ.get('PORT', 10000))
+    
+    # app.run() is used for local development.
+    # In production, a proper WSGI server like Gunicorn or uWSGI should be used.
     app.run(host='0.0.0.0', port=port, debug=True)
